@@ -1,0 +1,1483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>破浪手账 · Swim Log</title>
+<style>
+  :root{
+    --ink:#f2fbfd;
+    --ink-soft:rgba(242,251,253,.62);
+    --accent:#aee5f2;
+    --line:rgba(255,255,255,.22);
+    --glass:rgba(255,255,255,.10);
+    --glass-h:rgba(255,255,255,.18);
+    --warn:#ffc2ae;
+    --good:#a8e6cf;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    font-family:"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+    background:#0d4a6a url('assets/pool-bg-pixel.png?v=1') center/cover fixed no-repeat;
+    color:var(--ink);
+    line-height:1.8;
+    overflow-x:hidden;
+  }
+  /* 压暗 veil，保证文字可读 */
+  body::before{
+    content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:linear-gradient(180deg, rgba(6,38,56,.28) 0%, rgba(5,32,48,.44) 55%, rgba(3,24,38,.58) 100%);
+  }
+  .genderRow{display:flex;gap:14px;justify-content:center;margin-top:2px;}
+  .gBtn{
+    border:1px solid var(--line);background:transparent;color:var(--ink-soft);
+    font-family:inherit;font-size:14px;padding:8px 36px;border-radius:999px;cursor:pointer;
+    transition:all .2s;letter-spacing:.25em;
+  }
+  .gBtn.on{border-color:var(--accent);color:var(--accent);background:rgba(174,229,242,.08);}
+  .laneRow{margin:14px 0 12px;}
+  #laneCv{display:block;width:100%;height:72px;image-rendering:pixelated;}
+  .wrap{max-width:680px;margin:0 auto;padding:48px 24px 96px;position:relative;z-index:1;}
+
+  /* ---------- 创建页 ---------- */
+  #screenCreate{text-align:center;padding-top:9vh;}
+  .titleZh{font-size:34px;letter-spacing:.35em;margin-left:.35em;text-shadow:0 2px 18px rgba(13,74,106,.45);}
+  .titleEn{font-size:13px;color:var(--ink-soft);letter-spacing:.28em;margin-top:8px;}
+  .wave{margin:36px auto 40px;width:120px;height:2px;background:rgba(255,255,255,.4);}
+  .field{margin:26px 0;}
+  .field label{display:block;font-size:13px;color:var(--ink-soft);letter-spacing:.2em;margin-bottom:8px;}
+  .field input{
+    width:220px;border:none;border-bottom:1px solid rgba(255,255,255,.4);background:transparent;
+    padding:8px 4px;font-size:18px;color:var(--ink);text-align:center;outline:none;
+    transition:border-color .25s;
+  }
+  .field input::placeholder{color:rgba(255,255,255,.38);}
+  .field input:focus{border-color:var(--accent);}
+  .btn{
+    display:inline-block;border:1px solid rgba(255,255,255,.55);color:#f2fcff;background:transparent;
+    padding:10px 34px;font-size:14px;letter-spacing:.25em;cursor:pointer;border-radius:999px;
+    transition:all .25s;margin-top:34px;font-family:inherit;
+  }
+  .btn:hover{background:rgba(255,255,255,.16);}
+  .btn.small{padding:6px 20px;font-size:12px;margin-top:0;}
+  .hint{font-size:12px;color:var(--ink-soft);margin-top:14px;}
+
+  /* ---------- 游戏页 ---------- */
+  #screenGame{display:none;}
+  .head{text-align:center;margin-bottom:34px;}
+  .head .name{font-size:22px;letter-spacing:.2em;text-shadow:0 2px 14px rgba(13,74,106,.4);}
+  .head .sub{font-size:12px;color:var(--ink-soft);margin-top:4px;letter-spacing:.1em;}
+  .traits{margin-top:12px;}
+  .trait{
+    display:inline-block;font-size:12px;color:var(--accent);
+    border:1px solid rgba(174,229,242,.5);border-radius:999px;padding:2px 14px;margin:0 5px;
+  }
+
+  .sec{margin:30px 0;}
+  .secTitle{font-size:12px;color:var(--ink-soft);letter-spacing:.3em;margin-bottom:14px;}
+  .barRow{display:flex;align-items:center;margin:10px 0;font-size:13px;}
+  .barRow .lb{width:74px;color:var(--ink-soft);flex-shrink:0;}
+  .bar{flex:1;height:6px;background:rgba(255,255,255,.16);border-radius:3px;overflow:hidden;}
+  .bar i{display:block;height:100%;background:var(--accent);border-radius:3px;transition:width .5s;}
+  .bar.fat i{background:var(--warn);}
+  .bar.hp i{background:var(--good);}
+  .barRow .num{width:52px;text-align:right;color:var(--ink-soft);font-size:12px;flex-shrink:0;}
+  .badgeSick{
+    display:inline-block;font-size:12px;color:var(--warn);border:1px solid rgba(255,194,174,.55);
+    border-radius:999px;padding:1px 12px;margin-left:8px;
+  }
+
+  .actions{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+  .act{
+    border:1px solid var(--line);border-radius:14px;padding:16px 18px;cursor:pointer;
+    transition:all .25s;background:var(--glass);text-align:left;font-family:inherit;color:var(--ink);
+  }
+  .act:hover{border-color:rgba(255,255,255,.55);background:var(--glass-h);transform:translateY(-1px);}
+  .act .t{font-size:14px;letter-spacing:.1em;}
+  .act .d{font-size:12px;color:var(--ink-soft);margin-top:4px;line-height:1.6;}
+  .act.wide{grid-column:1/-1;text-align:center;}
+  .actTreat{border-color:rgba(255,194,174,.6);}
+  .actTreat .t{color:var(--warn);}
+
+  .tabs{display:flex;gap:26px;justify-content:center;margin:44px 0 18px;font-size:13px;color:var(--ink-soft);}
+  .tab{cursor:pointer;letter-spacing:.2em;padding-bottom:4px;border-bottom:2px solid transparent;transition:all .2s;}
+  .tab.on{color:var(--accent);border-color:var(--accent);}
+  .panel{display:none;}
+  .panel.on{display:block;}
+
+  .logItem{padding:12px 2px;border-bottom:1px dashed var(--line);font-size:13.5px;}
+  .logItem .d{color:var(--ink-soft);font-size:12px;margin-right:10px;}
+  .logItem.ev{color:var(--accent);}
+
+  .friendCard{padding:16px 4px;border-bottom:1px dashed var(--line);display:flex;align-items:center;justify-content:space-between;gap:14px;}
+  .friendCard .fi{flex:1;}
+  .friendCard .fn{font-size:14px;letter-spacing:.08em;}
+  .friendCard .fn .city{color:var(--accent);font-size:12px;margin-left:10px;}
+  .friendCard .fq{font-size:12.5px;color:var(--ink-soft);margin-top:3px;}
+  .friendCard .fa{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+  .stageTag{font-size:11px;color:var(--good);border:1px solid rgba(168,230,207,.5);border-radius:999px;padding:0 8px;margin-left:8px;}
+  .chatBtn{
+    flex-shrink:0;border:1px solid rgba(255,255,255,.4);background:transparent;color:var(--ink);
+    font-size:12px;padding:5px 16px;border-radius:999px;cursor:pointer;transition:all .2s;font-family:inherit;letter-spacing:.15em;
+  }
+  .chatBtn:hover{background:rgba(255,255,255,.14);}
+
+  .medalRow{display:flex;gap:34px;justify-content:center;margin:22px 0;}
+  .medal{text-align:center;}
+  .medal .m{font-size:26px;}
+  .medal .c{font-size:12px;color:var(--ink-soft);letter-spacing:.15em;}
+  .meetItem{padding:10px 2px;border-bottom:1px dashed var(--line);font-size:13px;color:var(--ink-soft);}
+  .meetItem b{color:var(--ink);font-weight:normal;}
+
+  .resetRow{text-align:center;margin-top:56px;}
+  .resetRow span{font-size:12px;color:var(--ink-soft);cursor:pointer;letter-spacing:.15em;border-bottom:1px dashed var(--line);}
+
+  /* ---------- 微信风聊天 ---------- */
+  .wxChat{background:#ededed;border-radius:12px;padding:14px 12px;text-align:left;}
+  .wxMsgs{max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;}
+  .wxRow{display:flex;align-items:flex-start;gap:8px;}
+  .wxRow.me{flex-direction:row-reverse;}
+  .wxAv{width:30px;height:30px;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;}
+  .bub{max-width:75%;background:#fff;color:#173140;border-radius:8px;padding:8px 12px;font-size:13px;line-height:1.7;}
+  .wxRow.me .bub{background:#95ec69;}
+  .wxOpts{display:flex;flex-direction:column;gap:8px;margin-top:12px;}
+  .wxOpt{background:#95ec69;color:#173140;border:none;border-radius:8px;padding:9px 12px;font-size:13px;cursor:pointer;font-family:inherit;text-align:left;line-height:1.6;transition:background .15s;}
+  .wxOpt:hover{background:#8ce55e;}
+  .wxEnd{background:transparent;border:1px dashed #b2b2b2;color:#8a8a8a;border-radius:8px;padding:8px 12px;font-size:12px;cursor:pointer;font-family:inherit;}
+
+  /* ---------- 收藏 ---------- */
+  .itemGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .itemCard{border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--glass);}
+  .itemCard .ic{font-size:26px;}
+  .itemCard .nm{font-size:13.5px;margin-top:4px;}
+  .itemCard .ct{font-size:12px;color:var(--ink-soft);line-height:1.6;}
+  .heart{margin-right:2px;}
+  .giftRow{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px dashed var(--line);padding:10px 2px;font-size:13px;text-align:left;}
+
+  /* ---------- 图鉴 ---------- */
+  .dexGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;}
+  .dexCell{border:1px solid var(--line);border-radius:10px;padding:10px 4px;text-align:center;background:var(--glass);opacity:.4;transition:all .3s;cursor:pointer;}
+  .dexCell:hover{border-color:rgba(174,229,242,.6);}
+  .pcImg{width:100%;border-radius:12px;display:block;background:rgba(255,255,255,.08);min-height:120px;}
+  .pcCap{font-size:12px;color:var(--ink-soft);margin-top:10px;letter-spacing:.2em;}
+  .pcBig{font-size:60px;line-height:1.4;}
+  .itemCard{cursor:pointer;}
+  .itemCard:hover{border-color:rgba(174,229,242,.6);}
+  .dexCell.on{opacity:1;border-color:rgba(174,229,242,.6);background:rgba(174,229,242,.10);}
+  .dexCell .di{font-size:18px;}
+  .dexCell .dn{font-size:11px;margin-top:2px;}
+  .dexTitle{font-size:12px;color:var(--ink-soft);letter-spacing:.3em;margin:20px 0 10px;}
+  .dexReward{font-size:12px;color:var(--good);margin-top:16px;line-height:2;}
+
+  /* ---------- 弹层 ---------- */
+  #modal{
+    position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(4,32,46,.45);z-index:50;
+  }
+  #modal.on{display:flex;}
+  .modalCard{
+    background:rgba(8,44,62,.82);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    border:1px solid rgba(255,255,255,.18);
+    border-radius:18px;padding:40px 38px;max-width:400px;width:88%;
+    text-align:center;box-shadow:0 18px 50px rgba(4,32,46,.4);
+  }
+  .modalCard .mt{font-size:15px;letter-spacing:.25em;margin-bottom:16px;color:var(--accent);}
+  .modalCard .mb{font-size:14px;line-height:2.1;}
+  .modalCard .mb b{color:#fff;font-weight:normal;}
+  #mdBtns{margin-top:26px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap;}
+  #mdBtns .btn{margin-top:0;}
+  .toast{
+    position:fixed;left:50%;bottom:40px;transform:translateX(-50%);
+    background:rgba(8,44,62,.92);color:#fff;font-size:13px;padding:9px 24px;border-radius:999px;
+    opacity:0;transition:opacity .4s;pointer-events:none;z-index:60;border:1px solid rgba(255,255,255,.15);
+  }
+  .toast.on{opacity:.95;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 创建角色 -->
+  <section id="screenCreate">
+    <div class="titleZh">破浪手账</div>
+    <div class="titleEn">SWIM LOG</div>
+    <div class="wave"></div>
+    <div class="field"><label>姓 名</label><input id="inName" maxlength="8" placeholder="给TA取个名字"></div>
+    <div class="field"><label>年 龄</label><input id="inAge" type="number" min="8" max="40" placeholder="8 - 40"></div>
+    <div class="field"><label>性 别</label><div class="genderRow"><button class="gBtn on" data-g="f">女</button><button class="gBtn" data-g="m">男</button></div></div>
+    <button class="btn" id="btnStart">翻 开 手 账</button>
+    <div class="hint">性格特征会在开局时随机生成，影响TA的整个运动生涯</div>
+  </section>
+
+  <!-- 游戏主界面 -->
+  <section id="screenGame">
+    <div class="head">
+      <div class="name" id="hName"></div>
+      <div class="sub" id="hSub"></div>
+      <div class="traits" id="hTraits"></div>
+    </div>
+
+    <div class="sec">
+      <div class="secTitle">属 性</div>
+      <div id="attrBars"></div>
+      <div id="sickBadge"></div>
+    </div>
+
+    <div class="sec">
+      <div class="secTitle">今 日 安 排 · 第 <span id="dayNum"></span> 月 · <span id="dayOfMonth"></span> 日</div>
+      <div class="actions" id="actions"></div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab on" data-tab="log">手账</div>
+      <div class="tab" data-tab="friends">好友</div>
+      <div class="tab" data-tab="items">收藏</div>
+      <div class="tab" data-tab="gear">道具</div>
+      <div class="tab" data-tab="dex">图鉴</div>
+      <div class="tab" data-tab="medals">战绩</div>
+    </div>
+
+    <div class="panel on" id="panel-log"><div id="logList"></div></div>
+    <div class="panel" id="panel-friends">
+      <div id="friendList"></div>
+      <div class="hint" id="friendHint"></div>
+    </div>
+    <div class="panel" id="panel-items">
+      <div id="itemList"></div>
+      <div class="hint" id="itemHint"></div>
+    </div>
+    <div class="panel" id="panel-gear">
+      <div id="gearList"></div>
+      <div class="hint" id="gearHint">道具在比赛时从赞助商摊位购得——买装备会分心，但特殊功能关键时刻能救命。</div>
+    </div>
+    <div class="panel" id="panel-dex">
+      <div id="dexList"></div>
+      <div class="hint">图鉴按足迹点亮：拿到哪座城市、哪个国家的纪念品，就点亮哪里。</div>
+    </div>
+    <div class="panel" id="panel-medals">
+      <div class="medalRow">
+        <div class="medal"><div class="m">🥇</div><div class="c">金牌 <span id="mGold">0</span></div></div>
+        <div class="medal"><div class="m">🥈</div><div class="c">银牌 <span id="mSilver">0</span></div></div>
+        <div class="medal"><div class="m">🥉</div><div class="c">铜牌 <span id="mBronze">0</span></div></div>
+      </div>
+      <div class="secTitle">比 赛 记 录</div>
+      <div id="meetList"></div>
+      <div class="secTitle" style="margin-top:26px">结 局</div>
+      <div id="endList"></div>
+    </div>
+
+    <div class="resetRow"><span id="btnReset">重新翻开一本手账</span></div>
+  </section>
+</div>
+
+<div id="modal"><div class="modalCard"><div class="mt" id="mdTitle"></div><div class="mb" id="mdBody"></div><div id="mdBtns"></div></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= 数据 ================= */
+const TRAITS = [
+  {id:'zl', name:'自律',   desc:'训练更勤奋（勤奋+15），但不肯休息，恢复变慢（休息效果-20%）'},
+  {id:'sx', name:'随性',   desc:'心态松弛，疲惫积累-15%，生病概率-20%'},
+  {id:'ty', name:'天赋异禀', desc:'天生水感好（天赋+18）'},
+  {id:'wq', name:'大器晚成', desc:'起点技术较低，但成长速度+20%'},
+  {id:'mg', name:'敏感体质', desc:'容易生病（生病概率+40%），但休息恢复+20%'},
+  {id:'sj', name:'社交达人', desc:'大赛后结识好友概率+25%，与好友聊天更投缘'},
+  {id:'dl', name:'独狼',   desc:'一个人练更专注（训练效果+8%），但结识好友概率-20%'},
+  {id:'nl', name:'逆流者',  desc:'疲惫很高（≥70）时训练效果反而+15%，越累越猛'},
+  {id:'tz', name:'童子功',  desc:'从小练水，技术成长+25%'},
+  {id:'tr', name:'铁人',   desc:'很少生病（生病概率-30%），疲惫的负面效果减半'}
+];
+const CITIES = ['南京','北京','上海','广州','成都','杭州','武汉','西安','哈尔滨','乌鲁木齐','厦门','青岛','昆明','大连','长沙','重庆','沈阳','兰州','郑州','海口'];
+const INT_LOCS = [
+  {city:'东京',country:'日本'},{city:'光州',country:'韩国'},{city:'新加坡',country:'新加坡'},{city:'曼谷',country:'泰国'},
+  {city:'多哈',country:'卡塔尔'},{city:'阿布扎比',country:'阿联酋'},{city:'伊斯坦布尔',country:'土耳其'},{city:'布达佩斯',country:'匈牙利'},
+  {city:'巴黎',country:'法国'},{city:'伦敦',country:'英国'},{city:'柏林',country:'德国'},{city:'鹿特丹',country:'荷兰'},
+  {city:'罗马',country:'意大利'},{city:'巴塞罗那',country:'西班牙'},{city:'喀山',country:'俄罗斯'},{city:'洛杉矶',country:'美国'},
+  {city:'蒙特利尔',country:'加拿大'},{city:'里约热内卢',country:'巴西'},{city:'墨尔本',country:'澳大利亚'},{city:'开罗',country:'埃及'}
+];
+const INT_MEETS = ['世界游泳锦标赛','亚运会','游泳世界杯分站赛','奥运会游泳测试赛'];
+/* 结局图鉴 */
+const ENDINGS = [
+  {id:'champion', t:'世界冠军之路', img:'assets/end-champion.png', hint:'参加奥运会，并站上最高领奖台',
+   b:'从省队的小泳池到奥运会的最高领奖台，<b>{name}</b>把名字写进了历史。<br><br>水面之下没人看见的那些年，都在这一秒的浪花里。'},
+  {id:'brothers', t:'四海皆兄弟', img:'assets/end-brothers.png', hint:'结识所有人物（国内每城 5 人 · 国际每国 10 人）',
+   b:'通讯录里存满了来自世界各地的名字。<br><br>每一座城市、每一个国家，都有人对<b>{name}</b>说：「赛道上见。」<br><br>泳池把世界连在了一起。'},
+  {id:'farewell', t:'水里的事，再与我无关', img:'assets/end-farewell.png', hint:'选择转行，离开泳池',
+   b:'收起泳镜的那天，<b>{name}</b>回头看了一眼空荡的泳池。<br><br>水声停在了身后，路在前面。'},
+  {id:'home', t:'泳池已是故乡', img:'assets/end-home.png', hint:'游到 32 岁，仍在坚持',
+   b:'32 岁，很多人早就不游了，而<b>{name}</b>还在日出前下水。<br><br>泳池不再是梦想的起点，而是生活本身。'},
+  {id:'golds', t:'金牌收藏家', img:'assets/end-golds.png', hint:'累计获得 8 枚金牌',
+   b:'八枚金牌，抽屉快关不上了。<br><br>但每次戴上其中任何一枚，<b>{name}</b>的心跳还是会快半拍。'}
+];
+const SURNAMES = ['林','陈','周','沈','顾','韩','杨','许','秦','姜','薛','方','程','叶','苏','魏','江','赵'];
+const GIVEN = ['屿','聿','知遥','晚舟','斯年','与安','照野','叙白','南絮','亦航','清晏','闻笛','舒扬','之涣','沐晴','望舒','北辰','海蓝','星回','可蓝'];
+const QUIRKS = ['总在赛后给对手递水','怕水呛，但动作最标准','会背整张泳道表','比赛前必听同一首歌','收集各地的泳池门票','说梦话都在打腿','从不看成绩榜，只看秒表','给每个对手起外号','赢了会请全队吃冰','认定你会站上领奖台'];
+const MEET_TIERS = [
+  {name:'城市邀请赛', rivals:[38,52]},
+  {name:'省锦标赛', rivals:[52,66]},
+  {name:'全国大学生游泳锦标赛', rivals:[64,80]},
+  {name:'全国冠军赛', rivals:[76,92]},
+  {name:'国家队选拔赛', rivals:[86,100]}
+];
+const TRIALS = [60, 180, 400, 700];
+const CHAT_TOPICS = [
+  {open:'说起{city}的家常菜，两眼放光，问你会不会做饭',
+   opts:[['报一道自己最拿手的菜，说得有滋有味',3],['说“还行吧，会煮泡面”',1],['说“运动员管住嘴，别惦记吃的”',-1]]},
+  {open:'提到下个月的比赛有点紧张，问你睡得好不好',
+   opts:[['分享自己缓解紧张的小仪式',3],['说“紧张就紧张呗，都一样”',1],['笑TA“这都能紧张？”',-1]]},
+  {open:'给你看刚寄到的游泳杂志，上面有TA的专访',
+   opts:[['认真读完，夸那段写得好',3],['竖了个大拇指',1],['说“杂志采访都吹水”',-1]]},
+  {open:'抱怨教练最近加量加得凶，胳膊都抬不起来',
+   opts:[['教TA一套自己常用的放松动作',3],['说“熬过去就好了”',1],['说“我这边更狠，你就别叫了”',-1]]},
+  {open:'问TA以后的目标是什么',
+   opts:[['说想站上更大的舞台，说得眼睛发光',3],['说“先把下一场比好”',1],['说“没想过，走一步看一步”',-1]]},
+  {open:'说起第一次比赛呛水的糗事，自己先笑了',
+   opts:[['把自己更糗的经历讲给TA听',3],['陪着一起笑',1],['说“这有什么好笑的”',-1]]},
+  {open:'说{city}这几天降温了，训练完从水里出来直打抖',
+   opts:[['提醒TA带保暖装备，别感冒了',3],['说“多泡会儿热水”',1],['说“冷点才清醒”',-1]]},
+  {open:'悄悄问：你觉得TA能进决赛吗',
+   opts:[['认真分析TA的技术，说“能，而且能上领奖台”',3],['说“稳住发挥就有戏”',1],['说“悬”',-1]]},
+  {open:'展示收藏的限量泳镜，说是{city}那场比赛抢到的',
+   opts:[['聊起泳镜防雾的小窍门',3],['说“挺好看”',1],['说“泳池里谁看泳镜啊”',-1]]},
+  {open:'问TA周末怎么过',
+   opts:[['约TA视频，互相监督陆上训练',3],['说“补觉，睡到中午”',1],['说“不告诉你”',-1]]}
+];
+const RE_3 = ['「哈哈哈哈，你怎么这么懂我！」','「跟你说这些真的舒服。」','「下次见面，我带你看个东西。」'];
+const RE_1 = ['「嗯嗯，有道理。」','「好嘞，就这么办。」','「聊得挺开心的。」'];
+const RE_M1 = ['「……哦。」','「啊，这样啊。」','「那个……我先去训练了。」'];
+const GENERICS = ['towel','bottle','pin','goggle','clip','cap'];
+const SUPPLEMENTS = ['蛋白粉','电解质泡腾片','鱼油软胶囊','氨基酸饮料','运动能量胶'];
+const GEAR = [
+  {id:'suit',  icon:'🩱', name:'竞速泳衣', desc:'使用后：下一场比赛发挥 +12，对手都看得到你的新装备'},
+  {id:'gel',   icon:'🍫', name:'能量胶',   desc:'使用后：下一次主课训练效果 ×2'},
+  {id:'drink', icon:'🧴', name:'恢复饮料', desc:'使用后：疲惫 -25，酸胀一扫而空'},
+  {id:'tape',  icon:'🩹', name:'肌效贴',   desc:'使用后：30 天内训练不会抽筋'},
+  {id:'salt',  icon:'🥤', name:'电解质片', desc:'使用后：健康 +10，整个人都精神了'}
+];
+const SOUVENIRS = [
+  {id:'card',  icon:'🏙️', name:'城市明信片', desc:'背面盖着比赛城市的邮戳'},
+  {id:'doll',  icon:'🧸', name:'吉祥物玩偶', desc:'赛事吉祥物，抱着睡觉刚刚好'},
+  {id:'towel', icon:'🧣', name:'纪念毛巾',   desc:'印着赛事logo，吸水一流'},
+  {id:'bottle',icon:'🥤', name:'纪念水壶',   desc:'摔不坏，跟你一样'},
+  {id:'pin',   icon:'🏅', name:'参赛纪念章', desc:'别在泳包上正好'},
+  {id:'goggle',icon:'🕶️', name:'泳镜挂坠',   desc:'迷你泳镜，做工意外地精緻'},
+  {id:'clip',  icon:'🐟', name:'鲨鱼发夹',   desc:'咬住头发的力度刚刚好'},
+  {id:'cap',   icon:'🧢', name:'签名泳帽',   desc:'上面有个歪歪扭扭的签名'}
+];
+const GIFT_THANKS = ['这也太懂我了吧！','你怎么知道我缺这个！','收下了，比赛给你带好运','我要摆在书桌上天天看','下次我也带东西送你'];
+const SAVE_KEY = 'swimlog_save_v3';
+/* 人物名册：国内每城 5 人，国际每国 10 人 */
+function buildRoster(){
+  const roster = [];
+  CITIES.forEach(c=>{ for(let i=0;i<5;i++) roster.push({r:c, intl:false}); });
+  INT_LOCS.forEach(l=>{ for(let i=0;i<10;i++) roster.push({r:l.city, intl:true}); });
+  roster.forEach(p=>{ p.n = pick(SURNAMES)+pick(GIVEN); p.q = pick(QUIRKS); });
+  return roster;
+}
+/* 结局解锁 */
+function unlockEnding(id){
+  S.endings = S.endings||{};
+  if(S.endings[id]) return;
+  S.endings[id] = true;
+  const e = ENDINGS.find(x=>x.id===id);
+  addLog('达成结局「'+e.t+'」。', true);
+  save();
+  _mq.push({t:'结 局 · '+e.t,
+    b:'<img class="pcImg" src="'+e.img+'" onerror="pcImgFail(this)"><div class="pcCap">'+e.t+'</div>'+e.b.replace(/\{name\}/g, S.name)});
+  flushMilestones();
+}
+function checkEndings(){
+  if(S.medals.gold >= 8) unlockEnding('golds');
+  if(S.roster && S.metIdx.length >= S.roster.length) unlockEnding('brothers');
+  if(S.age >= 32 && !S.over) unlockEnding('home');
+}
+
+/* ================= 状态 ================= */
+let S = null;
+const R = n => Math.floor(Math.random()*n);
+const pick = a => a[R(a.length)];
+const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
+const has = id => S.traits.includes(id);
+/* 时间：一次操作 = 10 天，30 天 = 1 个月，360 天 = 1 岁 */
+const TICK = 10;
+const monthOf = d => Math.floor((d-1)/30)+1;
+const dayOfM = d => ((d-1)%30)+1;
+const fmtD = d => monthOf(d)+'月'+dayOfM(d)+'日';
+/* 地标照片库（图鉴/明信片大图用），分身核验后填入 */
+const LANDMARKS = {
+  '南京':   {name:'夫子庙秦淮河', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/KuiGuangGe_of_Nanjing_Confucian_Temple.jpg/500px-KuiGuangGe_of_Nanjing_Confucian_Temple.jpg'},
+  '北京':   {name:'故宫', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/The_Forbidden_City_-_View_from_Coal_Hill.jpg/960px-The_Forbidden_City_-_View_from_Coal_Hill.jpg'},
+  '上海':   {name:'外滩·陆家嘴天际线', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/6/64/Shanghai_skyline_from_the_bund.jpg/500px-Shanghai_skyline_from_the_bund.jpg'},
+  '广州':   {name:'广州塔', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/Canton_Tower_20241027_%28cropped%29.jpg/960px-Canton_Tower_20241027_%28cropped%29.jpg'},
+  '成都':   {name:'大熊猫繁育研究基地', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Chengdu_Research_Base_Eingang.jpg/960px-Chengdu_Research_Base_Eingang.jpg'},
+  '杭州':   {name:'西湖', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/West_Lake%2C_Hangzhou_2025.jpg/1280px-West_Lake%2C_Hangzhou_2025.jpg'},
+  '武汉':   {name:'黄鹤楼', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/CN_-_Hubei_-_Wuhan_-_Kranichpagode.jpg/500px-CN_-_Hubei_-_Wuhan_-_Kranichpagode.jpg'},
+  '西安':   {name:'兵马俑', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/51714-Terracota-Army.jpg/330px-51714-Terracota-Army.jpg'},
+  '哈尔滨': {name:'圣索菲亚大教堂', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/West_facade_of_St._Sophia_Cathedral%2C_Harbin_%2820230721150450%29.jpg/330px-West_facade_of_St._Sophia_Cathedral%2C_Harbin_%2820230721150450%29.jpg'},
+  '乌鲁木齐':{name:'天山天池', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f0/The_Heavenly_Lake_%E5%A4%A9%E6%B1%A0_%288064381762%29.jpg/500px-The_Heavenly_Lake_%E5%A4%A9%E6%B1%A0_%288064381762%29.jpg'},
+  '厦门':   {name:'鼓浪屿', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/2018%E5%B9%B4%E7%9A%84%E9%BC%93%E6%B5%AA%E5%B1%BF.jpg/330px-2018%E5%B9%B4%E7%9A%84%E9%BC%93%E6%B5%AA%E5%B1%BF.jpg'},
+  '青岛':   {name:'栈桥', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/%E9%9D%92%E5%B2%9B%E6%A0%88%E6%A1%A5_Ehemalige_Landungsbr%C3%BCcke_Qingdao.jpg/330px-%E9%9D%92%E5%B2%9B%E6%A0%88%E6%A1%A5_Ehemalige_Landungsbr%C3%BCcke_Qingdao.jpg'},
+  '昆明':   {name:'石林', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Shilin%2C_Yunnan_24740.jpg/960px-Shilin%2C_Yunnan_24740.jpg'},
+  '大连':   {name:'星海广场', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Xinghai_Square_.jpg/960px-Xinghai_Square_.jpg'},
+  '长沙':   {name:'橘子洲头', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/Orange_Isle_2021122661.jpg/500px-Orange_Isle_2021122661.jpg'},
+  '重庆':   {name:'洪崖洞', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/6/64/202308_Hongya_Cave_at_night_from_Qiansimen_Bridge.jpg/1280px-202308_Hongya_Cave_at_night_from_Qiansimen_Bridge.jpg'},
+  '沈阳':   {name:'沈阳故宫', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Mukden_Palace_drone_view_5_%28cropped_%26_rotated%29.jpg/330px-Mukden_Palace_drone_view_5_%28cropped_%26_rotated%29.jpg'},
+  '兰州':   {name:'中山桥（黄河铁桥）', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Zhongshan_Bridge_in_Lanzhou.jpg/500px-Zhongshan_Bridge_in_Lanzhou.jpg'},
+  '郑州':   {name:'嵩山少林寺', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Shaolin_Temple_%2810199450903%29.jpg/500px-Shaolin_Temple_%2810199450903%29.jpg'},
+  '海口':   {name:'世纪大桥', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Haikou_Century_Bridge_viewed_from_Haidian_Island_-_01.jpg/500px-Haikou_Century_Bridge_viewed_from_Haidian_Island_-_01.jpg'},
+  '日本':   {name:'富士山', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/View_of_Mount_Fuji_from_%C5%8Cwakudani_20211202.jpg/500px-View_of_Mount_Fuji_from_%C5%8Cwakudani_20211202.jpg'},
+  '韩国':   {name:'景福宫', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/6/63/%EA%B4%91%ED%99%94%EB%AC%B8_%EC%9B%94%EB%8C%80.jpg/1280px-%EA%B4%91%ED%99%94%EB%AC%B8_%EC%9B%94%EB%8C%80.jpg'},
+  '新加坡': {name:'滨海湾金沙', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Marina_Bay_Sands_%28I%29.jpg/960px-Marina_Bay_Sands_%28I%29.jpg'},
+  '泰国':   {name:'曼谷大皇宫', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/0005574_-_Wat_Phra_Kaew_006.jpg/1280px-0005574_-_Wat_Phra_Kaew_006.jpg'},
+  '卡塔尔': {name:'多哈伊斯兰艺术博物馆', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Museum_of_Islamic_Art%2C_Doha_%2842258469495%29.jpg/960px-Museum_of_Islamic_Art%2C_Doha_%2842258469495%29.jpg'},
+  '阿联酋': {name:'哈利法塔', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Burj_Khalifa_%28worlds_tallest_building%29_and_the_Dubai_skyline_%2825781049892%29.jpg/960px-Burj_Khalifa_%28worlds_tallest_building%29_and_the_Dubai_skyline_%2825781049892%29.jpg'},
+  '土耳其': {name:'伊斯坦布尔圣索菲亚', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Hagia_Sophia_%28228968325%29.jpeg/500px-Hagia_Sophia_%28228968325%29.jpeg'},
+  '匈牙利': {name:'布达佩斯国会大厦', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/Hungarian_Parliament_Building_from_across_the_Danube%2C_2025-01-11.jpg/330px-Hungarian_Parliament_Building_from_across_the_Danube%2C_2025-01-11.jpg'},
+  '法国':   {name:'埃菲尔铁塔', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Tour_Eiffel_14.jpg/960px-Tour_Eiffel_14.jpg'},
+  '英国':   {name:'伦敦塔桥', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/5/59/Tower_Bridge_at_Dawn.jpg/500px-Tower_Bridge_at_Dawn.jpg'},
+  '德国':   {name:'勃兰登堡门', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Brandenburger_Tor_abends.jpg/960px-Brandenburger_Tor_abends.jpg'},
+  '荷兰':   {name:'小孩堤防风车', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/KinderdijkWindmills.jpg/500px-KinderdijkWindmills.jpg'},
+  '意大利': {name:'罗马斗兽场', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/Colosseo_2020.jpg/500px-Colosseo_2020.jpg'},
+  '西班牙': {name:'圣家堂', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/SF_maig_2_cropped.jpg/330px-SF_maig_2_cropped.jpg'},
+  '俄罗斯': {name:'圣瓦西里大教堂', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Saint_Basil%27s_Cathedral_in_Moscow.jpg/960px-Saint_Basil%27s_Cathedral_in_Moscow.jpg'},
+  '美国':   {name:'金门大桥', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/Golden_Gate_Bridge_as_seen_from_Battery_East.jpg/500px-Golden_Gate_Bridge_as_seen_from_Battery_East.jpg'},
+  '加拿大': {name:'路易斯湖', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6c/1_lake_louise_pano_2019.jpg/500px-1_lake_louise_pano_2019.jpg'},
+  '巴西':   {name:'里约基督像', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Christ_the_Redeemer_-_Cristo_Redentor.jpg/960px-Christ_the_Redeemer_-_Cristo_Redentor.jpg'},
+  '澳大利亚':{name:'悉尼歌剧院', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Sydney_Australia._%2821339175489%29.jpg/960px-Sydney_Australia._%2821339175489%29.jpg'},
+  '埃及':   {name:'吉萨金字塔', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Pyramids_of_the_Giza_Necropolis.jpg/960px-Pyramids_of_the_Giza_Necropolis.jpg'}
+};
+function photoOf(place){
+  if(LANDMARKS[place]) return LANDMARKS[place];
+  const loc = INT_LOCS.find(l=>l.city===place);
+  if(loc && LANDMARKS[loc.country]) return LANDMARKS[loc.country];
+  return null;
+}
+/* wikimedia 直连本机不通，走 wsrv.nl 免费图代理（离线时降级 emoji） */
+function imgUrl(u){ return 'https://wsrv.nl/?url=' + u.replace(/^https:\/\//, '') ; }
+
+function rollTraits(){
+  const idx = [];
+  while(idx.length<2){ const r=R(TRAITS.length); if(!idx.includes(r)) idx.push(r); }
+  return idx.map(i=>TRAITS[i].id);
+}
+
+function newGame(name, age, gender){
+  const traits = rollTraits();
+  S = {
+    name, age:clamp(age,8,40), traits, gender:gender||'f',
+    diligence: clamp(48+R(24), 0, 100),
+    health:    clamp(76+R(20), 0, 100),
+    talent:    clamp(44+R(38), 0, 100),
+    tech: 15+R(10), strength: 15+R(10),
+    fatigue: 0, trained:0, day:1, sick:false,
+    trialIdx:0, trialDay:null,
+    meetDay:null,
+    friends:[], medals:{gold:0,silver:0,bronze:0}, meets:[], log:[],
+    over:false, intCount:0, chats:0, swimX:0, laps:0, items:{},
+    dex:{cn:{}, intl:{}}, rewards:{}, buffDay:0, globalMult:1, restStreak:0, startAge: clamp(age,8,40),
+    gear:{}, suitBuff:false, gelBuff:false, tapeUntil:0, sponsorAsked:false, meetDistract:false,
+    roster: buildRoster(), metIdx:[], endings:{}
+  };
+  traits.forEach(t=>{
+    if(t==='zl') S.diligence = clamp(S.diligence+15,0,100);
+    if(t==='ty') S.talent    = clamp(S.talent+18,0,100);
+    if(t==='wq') S.tech      = Math.max(8, S.tech-10);
+  });
+  addLog('翻开手账的第一页。'+S.name+'，'+S.age+'岁，站在了泳池边。');
+  traits.forEach(t=>{
+    const d = TRAITS.find(x=>x.id===t);
+    addLog('性格特征 · '+d.name+'：'+d.desc);
+  });
+  save();
+}
+
+/* ================= 数值 ================= */
+function fatigueMult(){
+  let base = S.fatigue<50 ? 1 : (S.fatigue<80 ? 0.65 : 0.35);
+  if(has('tr')) base = base + (1-base)*0.5;
+  if(has('nl') && S.fatigue>=70) base *= 1.15;
+  return base;
+}
+function affBuff(){
+  let a = 0;
+  S.friends.forEach(f=>{ a += Math.floor((f.aff||0)/3) * ((f.stage||0)>=3 ? 2 : 1); });
+  return a * 0.01;
+}
+function growthMult(){
+  let g = 1;
+  if(has('wq')) g *= 1.2;
+  if(has('dl')) g *= 1.08;
+  g *= 1 + Math.min(S.friends.length,10) * (has('sj')?0.003:0.002);
+  g *= 1 + affBuff();
+  g *= S.globalMult||1;
+  return g;
+}
+/* 天赋上限：天赋越低，单日训练量收益封顶越低 */
+function talentCap(){
+  return 4 + S.talent*0.16;
+}
+/* 年龄阶段：年龄影响训练效果 */
+function ageStage(){
+  const a = S.age;
+  if(a<=13) return {name:'童子班', gain:1.0, tech:1.3, strength:0.75, note:'年纪小，水感学得飞快，力量还得慢慢长'};
+  if(a<=17) return {name:'青苗期', gain:1.1, tech:1.1, strength:0.9,  note:'长身体的年纪，进步快，也容易累'};
+  if(a<=23) return {name:'黄金期', gain:1.0, tech:1.0, strength:1.0,  note:'运动员最好的年纪'};
+  if(a<=30) return {name:'成熟期', gain:0.95, tech:1.1, strength:0.9, note:'经验在涨，恢复变慢了'};
+  return        {name:'老将',   gain:0.85, tech:1.2, strength:0.85, note:'靠经验吃饭，每一分训练量都珍贵'};
+}
+/* 好感度阶段：50/80/100 关系进阶 */
+const AFF_STAGES = [
+  {at:50,  name:'老朋友', desc:'比赛到哪都惦记着给你带点东西——TA会开始给你寄所在城市的明信片。'},
+  {at:80,  name:'知己',   desc:'失眠的夜里会打给你的那种。聊天次数上限 +1，TA送礼的好感也从 +3 涨到 +4。'},
+  {at:100, name:'并肩的人', desc:'赛道两端，一眼就能找到彼此。TA的好感为训练带来的加成翻倍。'}
+];
+function affStageOf(v){ let s=0; AFF_STAGES.forEach(st=>{ if(v>=st.at) s++; }); return s; }
+function checkAffStage(f){
+  const ns = affStageOf(f.aff||0);
+  if((f.stage||0) < ns){
+    f.stage = ns;
+    const st = AFF_STAGES[ns-1];
+    addLog('和'+f.name+'的关系更近了一步：「'+st.name+'」。', true);
+    _mq.push({t:'关 系 · '+st.name, b:'和'+f.name+'的好感度到了<b>'+st.at+'</b>。<br><br>'+st.desc});
+  }
+}
+let _mq = [];
+function flushMilestones(){
+  if(_mq.length){ const m=_mq.shift(); showModal(m.t, m.b, m.btns); }
+}
+function chatLimit(){
+  let n = 3;
+  S.friends.forEach(f=>{ if((f.stage||0)>=2) n++; });
+  return Math.min(n, 5);
+}
+function restMult(){
+  let r = 1;
+  if(has('zl')) r *= 0.8;
+  if(has('mg')) r *= 1.2;
+  return r;
+}
+function sickChance(){
+  let c = 0.03 + (S.fatigue/100)*0.07 - (S.health/100)*0.04;
+  if(has('mg')) c *= 1.4;
+  if(has('tr')) c *= 0.7;
+  if(has('sx')) c *= 0.8;
+  return clamp(c, 0.005, 0.3);
+}
+function friendChance(){
+  let c = 0.65;
+  if(has('sj')) c += 0.25;
+  if(has('dl')) c -= 0.2;
+  return clamp(c, 0.1, 0.95);
+}
+
+/* ================= 一天的推进 ================= */
+function doAction(kind){
+  if(!S || S.over) return;
+  if(kind==='treat'){
+    S.sick=false; S.health=clamp(S.health+10,0,100);
+    addLog('看了医生，吃了药，好好睡了一觉。');
+  }
+  else if(kind==='main'){
+    laneSwim();
+    S.restStreak = 0;
+    const dip = restDip();
+    let gain = (10 + S.diligence*0.10 + R(6)) * fatigueMult() * growthMult() * ageStage().gain * dip;
+    if(S.buffDay===S.day) gain *= 1.5;
+    let gelNote = '';
+    if(S.gelBuff){ gain *= 2; S.gelBuff=false; gelNote = '（能量胶生效，效果翻倍）'; }
+    const cramp = tapeActive() ? false : Math.random() < 0.07;
+    if(cramp){ gain *= 0.5; S.fatigue = clamp(S.fatigue+4, 0, 100); }
+    gain = Math.max(1, Math.round(gain));
+    const cap = Math.round(talentCap());
+    const capped = gain > cap;
+    gain = Math.min(gain, cap);
+    S.trained += gain;
+    S.fatigue = clamp(S.fatigue + Math.round(16 - S.diligence*0.05 + R(6)), 0, 100);
+    S.tech += 0.3;
+    addLog('主课训练'+(S.sick?'（带病上场）':'')+(cramp?'，中途小腿抽筋，量打了折':'')+gelNote+(dip<1?'（歇太久了，状态有点下滑）':'')+'，训练量 +'+gain+'。'+(capped?'（天赋所限，今天再练也吞不下更多了）':'')+fatigueNote());
+  }
+  else if(kind==='tech'){
+    laneLand('tech');
+    S.restStreak = 0;
+    let g = (2 + R(2)) * growthMult() * (S.sick?0.4:fatigueMult()) * ageStage().tech * restDip();
+    const cramp = tapeActive() ? false : Math.random() < 0.05;
+    if(cramp){ g *= 0.5; S.fatigue = clamp(S.fatigue+4, 0, 100); }
+    S.tech = Math.min(100, S.tech + Math.max(0.5, g));
+    S.fatigue = clamp(S.fatigue + 9 + R(4), 0, 100);
+    addLog('技术课，专抠转身和出发。'+(cramp?'（中途抽筋，效果减半）':''));
+  }
+  else if(kind==='strength'){
+    laneLand('gym');
+    S.restStreak = 0;
+    let g = (2 + R(2)) * growthMult() * (S.sick?0.4:fatigueMult()) * ageStage().strength * restDip();
+    const cramp = tapeActive() ? false : Math.random() < 0.05;
+    if(cramp){ g *= 0.5; S.fatigue = clamp(S.fatigue+4, 0, 100); }
+    S.strength = Math.min(100, S.strength + Math.max(0.5, g));
+    S.fatigue = clamp(S.fatigue + 12 + R(5), 0, 100);
+    addLog('陆上力量课，撸铁撸到手抖。'+(cramp?'（中途抽筋，效果减半）':''));
+  }
+  else if(kind==='rest'){
+    laneLand('sleep');
+    S.restStreak = (S.restStreak||0) + 1;
+    S.fatigue = clamp(S.fatigue - Math.round(30*restMult()), 0, 100);
+    S.health = clamp(S.health + 6, 0, 100);
+    let note = S.sick ? '病还没好，今天在宿舍躺着。' : '休息日，睡到自然醒，身体轻了一点。';
+    if(S.restStreak > 2) note += '（连着歇了'+S.restStreak+'次，肌肉有点松了——下次训练效果 -'+Math.round((1-restDip())*100)+'%）';
+    addLog(note);
+    if(S.sick){ S.sick=false; addLog('病好了。'); }
+  }
+
+  if(!S.sick && kind!=='treat'){
+    if(Math.random() < sickChance()){
+      S.sick = true;
+      addLog('鼻子一酸——感冒了，明天可能练不动。', true);
+    }
+  }
+  if(S.sick) S.health = clamp(S.health-3, 0, 100);
+  // 训练中偶尔拾到纪念品
+  if(kind!=='treat' && Math.random() < 0.05){
+    gainItem(pick(GENERICS));
+  }
+
+  S.day += TICK;
+  S.chats = 0;
+  // 生日与年龄增长（360 天 = 1 岁）
+  const na = S.startAge + Math.floor((S.day-1)/360);
+  if(na > S.age){ S.age = na; addLog('过了个生日——'+S.age+' 岁了，生日愿望是游得再快一点。', true); }
+  checkEndings();
+  randomEvent();
+  scheduleTrial();
+  offerTrial();
+  scheduleMeet();
+  offerMeet();
+  offerRetire();
+  offerInternational();
+  save();
+  render();
+}
+/* 休息滑坡：连续休息后训练效果下降 */
+function restDip(){
+  const st = S.restStreak||0;
+  if(st <= 2) return 1;
+  return clamp(1 - 0.05*(st-2), 0.6, 1);
+}
+/* 肌效贴有效期 */
+function tapeActive(){ return S.tapeUntil && S.day <= S.tapeUntil; }
+function fatigueNote(){
+  if(S.fatigue>=80) return '肩膀已经抬不起来了。';
+  if(S.fatigue>=50) return '有点累了，注意节奏。';
+  return '';
+}
+
+const EVENTS = [
+  '食堂阿姨多给了一勺糖醋排骨，心情不错。',
+  '泳镜忘带了，白跑一趟，原地做了三十个俯卧撑。',
+  '教练难得夸了一句“动作有样子了”。',
+  '傍晚的泳池没人，一个人游完了全程，很安静。',
+  '看了一场比赛录像，盯着人家的划水频率看了半小时。',
+  '更衣室的柜子门坏了，用胶带缠好了，居然挺牢。',
+  '脖子有点僵，队医捏了两下，酸得龗牙咧嘴。',
+  '电视里在放游泳比赛，看到熟悉的对手赢了好几场。',
+  '阳台上的多肉长出新叶子了，比想象中顽强。',
+  '梦见自己压水压得太深，醒来发现腿真的在动。'
+];
+function randomEvent(){
+  if(Math.random()<0.08){ offerSupplement(); return; }
+  if(Math.random()<0.12){ offerSpecialEvent(); return; }
+  if(Math.random()<0.15) addLog(pick(EVENTS), true);
+}
+/* 突发事件：带选择的特殊事件 */
+const SPECIAL_EVENTS = [
+  {t:'泳 池 检 修', b:'泳池要检修几天，这几天只能上陆上。<br><br>怎么安排？', opts:[
+    {label:'加练陆上', cb:()=>{ S.strength=Math.min(100,S.strength+2); S.fatigue=clamp(S.fatigue+6,0,100); addLog('泳池检修，加练了陆上（力量 +2）。', true); }},
+    {label:'趁机休息', cb:()=>{ S.fatigue=clamp(S.fatigue-10,0,100); addLog('泳池检修，正好歇了几天（疲惫 -10）。'); }}]},
+  {t:'高 原 集 训', b:'教练问你：愿不愿意去高原集训一阵子？<br><br>练得苦，但据说回来之后整个人都不一样。', opts:[
+    {label:'去吧', cb:()=>{ S.trained+=30; S.fatigue=clamp(S.fatigue+15,0,100); addLog('去高原集训了一圈，回来肺活量明显变了（训练量 +30，疲惫 +15）。', true); }},
+    {label:'留在基地', cb:()=>{ addLog('没去高原，按自己的节奏练。'); }}]},
+  {t:'队 内 测 试', b:'队里临时搞了场 50 米测试赛，对手是队里最快的那个。<br><br>游不游真的？', opts:[
+    {label:'全力游', cb:()=>{
+      if(Math.random() < 0.35 + S.talent*0.004){ S.diligence=clamp(S.diligence+3,0,100); addLog('测试赛赢了队里最快的那个！整个队都看呆了（勤奋 +3）。', true); }
+      else { S.fatigue=clamp(S.fatigue+8,0,100); addLog('测试赛输了，但游出了训练里没有的强度（疲惫 +8）。', true); } }},
+    {label:'保留实力', cb:()=>{ addLog('测试赛随便游了游，没人知道你的底牌。'); }}]},
+  {t:'泳 迷 来 信', b:'信箱里躺着一封信，是个小学四年级的小朋友写的：「姐姐（哥哥），我在电视上看到你了，我也要学游泳。」<br><br>回不回？', opts:[
+    {label:'认真回一封', cb:()=>{ S.diligence=clamp(S.diligence+2,0,100); addLog('给小朋友回了信，写着写着自己也热血起来（勤奋 +2）。', true); }},
+    {label:'收进抽屉', cb:()=>{ addLog('把信收进了抽屉最里层。'); }}]},
+  {t:'深 夜 加 练', b:'半夜睡不着，脑子里全是转身那个慢了零点三秒的动作。<br><br>泳池夜里有灯……去吗？', opts:[
+    {label:'偷偷去加练', cb:()=>{ S.trained+=15; S.fatigue=clamp(S.fatigue+10,0,100); addLog('深夜偷偷加练，泳道只有一个人和月亮（训练量 +15，疲惫 +10）。', true);
+      if(Math.random()<0.25){ S.sick=true; addLog('夜里的水太凉，第二天鼻子开始不通。', true); } }},
+    {label:'回去睡觉', cb:()=>{ S.fatigue=clamp(S.fatigue-8,0,100); addLog('翻了个身，把动作默想了一遍就睡着了（疲惫 -8）。'); }}]},
+  {t:'赞 助 商', b:'本地一家运动品牌找上门：愿意赞助你全套装备，条件是比赛穿他家的泳衣。<br><br>接不接？', opts:[
+    {label:'接下赞助', cb:()=>{ S.trained+=20; addLog('接了赞助，新泳衣贴身又轻，训练都轻快了几分（训练量 +20）。', true); }},
+    {label:'婉拒', cb:()=>{ addLog('婉拒了赞助：「先拿成绩说话。」'); }}]},
+  {t:'教 小 朋 友', b:'周末市里有公益活动，请你去教一群小朋友玩水。<br><br>半天时间，去吗？', opts:[
+    {label:'去教他们', cb:()=>{ S.health=clamp(S.health+4,0,100); addLog('教了一下午小朋友打腿，被喊了好多次“教练”（健康 +4）。', true); }},
+    {label:'专心备战', cb:()=>{ S.trained+=10; addLog('推掉了活动，多练了一下午（训练量 +10）。'); }}]}
+];
+function offerSpecialEvent(){
+  const ev = pick(SPECIAL_EVENTS);
+  showModal(ev.t, ev.b, ev.opts.map(o=>({label:o.label, cb:()=>{ o.cb(); save(); }})));
+}
+/* 随机事件：运动补剂（buff 还是 debuff 不好说） */
+function offerSupplement(){
+  const who = pick(['教练','同屋的队友','别的运动员','队医']);
+  const what = pick(SUPPLEMENTS);
+  showModal('运 动 补 剂',
+    who+'塞给你一罐<b>'+what+'</b>：「练这么狠，补补。」<br><br>罐子上没个正经标签……吃吗？',
+    [
+      {label:'吃', cb:supResult},
+      {label:'不吃', cb:()=>{ addLog('把'+what+'原样退了回去。'); }}
+    ]);
+}
+function supResult(){
+  if(Math.random()<0.8){
+    const roll = R(3);
+    if(roll===0){
+      S.fatigue = clamp(S.fatigue-12, 0, 100);
+      addLog('补剂管用了，肌肉的酸胀轻了不少（疲惫 -12）。', true);
+      showModal('补 剂 效 果', '肌肉的酸胀消下去不少——是真东西。<br><br>疲惫 -12。');
+    }else if(roll===1){
+      S.health = clamp(S.health+8, 0, 100);
+      addLog('当晚睡得特别沉，第二天精神很好（健康 +8）。', true);
+      showModal('补 剂 效 果', '一觉睡到天亮，神清气爽。<br><br>健康 +8。');
+    }else{
+      S.buffDay = S.day;
+      addLog('状态莫名地好，感觉下次训练能翻倍（训练效果 +50%）。', true);
+      showModal('补 剂 效 果', '浑身是劲，水感都清亮了几分。<br><br>下一次训练效果 <b>+50%</b>。');
+    }
+  }else{
+    S.health = clamp(S.health-8, 0, 100);
+    S.fatigue = clamp(S.fatigue+8, 0, 100);
+    addLog('半夜肚子不舒服——像是买到了三无产品（健康 -8，疲惫 +8）。', true);
+    showModal('补 剂 效 果', '半夜肚子一阵不舒服……<br><br>像是买到三无产品了。健康 -8，疲惫 +8。');
+  }
+  save();
+}
+
+/* ================= 选拔赛：随机事件 + 弹框选择 ================= */
+function scheduleTrial(){
+  if(S.trialIdx < TRIALS.length && S.trained >= TRIALS[S.trialIdx] && S.trialDay===null){
+    const wait = (1+R(3))*TICK;
+    S.trialDay = S.day + wait;
+    addLog('教练拍拍你的肩：最近练得不错，'+wait+'天后队里可能有一场选拔赛，随时准备。', true);
+  }
+}
+function offerTrial(){
+  if(S.trialDay !== null && S.day >= S.trialDay){
+    const tier = MEET_TIERS[S.trialIdx];
+    const p = trialChance();
+    showModal('选 拔 赛',
+      '今天队里临时宣布有一场选拔赛，通过的可以去打<b>「'+tier.name+'」</b>。<br><br>你的状态：疲惫 '+S.fatigue+(S.sick?' · 还在生病':'')+'<br>胜算大约 <b>'+Math.round(p*100)+'%</b>。<br><br>参不参加？',
+      [
+        {label:'跳下去', cb:runTrial},
+        {label:'这次算了', cb:()=>{ S.trialDay = S.day + (3+R(4))*TICK; addLog('这次选拔没报名，教练说下次还有机会。'); }}
+      ]);
+  }
+}
+function trialChance(){
+  let p = 0.32 + S.talent*0.004 + S.diligence*0.002 - S.fatigue*0.003 - (S.sick?0.15:0);
+  return clamp(p, 0.08, 0.95);
+}
+function runTrial(){
+  S.trialDay = null;
+  const tier = MEET_TIERS[S.trialIdx];
+  if(Math.random() < trialChance()){
+    S.trialIdx++;
+    showModal('选 拔 赛', S.name+'深吸一口气，跳了下去。<br><br>通过了<b>「'+tier.name+'」</b>的选拔！');
+    addLog('选拔赛通过！获得'+tier.name+'参赛资格。', true);
+    scheduleMeet();
+  }else{
+    const wait = (2+R(3))*TICK;
+    S.trialDay = S.day + wait;
+    showModal('选 拔 赛', S.name+'这一趟游得急了。<br><br>选拔没有通过，教练说：'+wait+'天后还有一次机会。');
+    addLog('选拔赛未通过，'+wait+'天后可以再试。');
+  }
+  save();
+}
+
+/* ================= 大赛：邀请 + 弹框选择 + 好友 ================= */
+function scheduleMeet(){
+  if(S.trialIdx >= 1 && S.meetDay===null){
+    const wait = 30+R(30);
+    S.meetDay = S.day + wait;
+    addLog('收到消息：'+wait+'天后，'+pick(CITIES)+'，可能有'+MEET_TIERS[Math.min(S.trialIdx,MEET_TIERS.length)-1].name+'。', true);
+  }
+}
+function offerMeet(){
+  if(S.meetDay !== null && S.day >= S.meetDay){
+    const tier = MEET_TIERS[Math.min(S.trialIdx,MEET_TIERS.length)-1];
+    const city = pick(CITIES);
+    showModal('比 赛 邀 请',
+      '<b>'+tier.name+'</b>（'+city+'）今天开赛。<br><br>你的状态：疲惫 '+S.fatigue+(S.sick?' · 还在生病':'')+'<br><br>去吗？赛场上说不定能认识别处的人。',
+      [
+        {label:'出发', cb:()=>{ if(Math.random() < 0.4){ offerSponsor(tier, city); } else { runMeet(tier, city); } }},
+        {label:'不去', cb:()=>{ S.meetDistract=false; addLog('推掉了'+city+'的比赛，继续闷头训练。'); S.meetDay = S.day + 30+R(30); }}
+      ]);
+  }
+}
+/* 赞助商摊位：去了赛场才有概率遇到；买道具有代价（本场比赛发挥 -10） */
+function offerSponsor(tier, city){
+  const picks = GEAR.slice().sort(()=>Math.random()-0.5).slice(0,2);
+  const rows = picks.map(p=>p.icon+' <b>'+p.name+'</b> —— '+p.desc.replace('使用后：','')).join('<br>');
+  showModal('赞 助 商 摊 位',
+    '刚到'+city+'的场馆门口，赞助商支起了小摊，冲你招手：<br><br>'+rows+'<br><br><span style="font-size:12px;color:var(--ink-soft)">买装备难免分心——这场比赛发挥 -10，道具会进「道具」板块随时可用</span>',
+    [
+      {label:'买 · '+picks[0].name, cb:()=>{ S.gear[picks[0].id]=(S.gear[picks[0].id]||0)+1; S.meetDistract=true; addLog('在赞助商摊位买了'+picks[0].name+'（本场比赛发挥 -10）。', true); save(); runMeet(tier, city); }},
+      {label:'买 · '+picks[1].name, cb:()=>{ S.gear[picks[1].id]=(S.gear[picks[1].id]||0)+1; S.meetDistract=true; addLog('在赞助商摊位买了'+picks[1].name+'（本场比赛发挥 -10）。', true); save(); runMeet(tier, city); }},
+      {label:'什么都不买', cb:()=>{ addLog('从赞助商摊位前走过，稳了稳心神。'); runMeet(tier, city); }}
+    ]);
+}
+function runMeet(tier, city){
+  S.meetDay = null;
+  const mine = S.talent*0.35 + S.tech*0.30 + S.strength*0.15 + S.diligence*0.10 + (100-S.fatigue)*0.10 + R(24)-12
+    + (S.suitBuff?12:0) - (S.meetDistract?10:0);
+  if(S.suitBuff){ S.suitBuff=false; addLog('竞速泳衣贴身如肤，划水都利落了几分。', true); }
+  S.meetDistract = false; S.sponsorAsked = false;
+  let better = 0;
+  for(let i=0;i<7;i++){
+    const rv = tier.rivals[0] + Math.random()*(tier.rivals[1]-tier.rivals[0]);
+    if(rv > mine) better++;
+  }
+  const rank = better+1;
+  let medalTxt = '', rankTxt = '第'+rank+'名';
+  if(rank===1){ S.medals.gold++; medalTxt='🥇 金牌'; }
+  else if(rank===2){ S.medals.silver++; medalTxt='🥈 银牌'; }
+  else if(rank===3){ S.medals.bronze++; medalTxt='🥉 铜牌'; }
+  S.meets.push({day:S.day, city, name:tier.name, rank});
+  addLog(tier.name+'（'+city+'）：'+rankTxt+(medalTxt?'，'+medalTxt:'')+'。', true);
+  // 比赛纪念品：明信片带城市邮戳，其余通用品
+  if(Math.random() < 0.30) gainItem('card', city);
+  else if(Math.random() < 0.22) gainItem(pick(GENERICS));
+  // 老朋友寄明信片
+  palPostcard();
+  let extra = '';
+  // 级别越高，认识的人越多
+  const meetChances = S.trialIdx>=3 ? [0.65,0.5,0.4] : (S.trialIdx>=2 ? [0.65,0.45] : [0.65]);
+  meetChances.forEach(ch=>{ if(Math.random() < ch){ const e = makeFriend(city); if(e) extra += e; } });
+  showModal(tier.name, city+'的泳池，八条泳道。<br><br>'+S.name+'拿到了<b>'+rankTxt+'</b>'+(medalTxt?'，'+medalTxt:'')+'。'+extra);
+  checkEndings();
+  scheduleTrialIfNeeded();
+  if(S.trialIdx >= 1){
+    const wait = 40+R(40);
+    S.meetDay = S.day + wait;
+    addLog('下一场比赛定在'+wait+'天后。');
+  }
+  save();
+}
+function makeFriend(city, intl){
+  let cand = S.roster.map((p,i)=>({p,i})).filter(o=>!S.metIdx.includes(o.i) && o.p.r===city);
+  if(!cand.length) cand = S.roster.map((p,i)=>({p,i})).filter(o=>!S.metIdx.includes(o.i));
+  if(!cand.length) return '';
+  const pickd = pick(cand);
+  S.metIdx.push(pickd.i);
+  const p = pickd.p;
+  const favs = SOUVENIRS.slice().sort(()=>Math.random()-0.5).slice(0,2).map(s=>s.id);
+  const f = { name:p.n, city:p.r, quirk:p.q, aff:0, fav:favs, stage:0, intl:p.intl };
+  S.friends.push(f);
+  addLog('结识了来自'+p.r+'的好友：'+p.n+'——'+p.q+'。', true);
+  return '<br><br>赛后认识了一个'+p.r+'的选手，叫<b>'+p.n+'</b>——'+p.q+'。可以在「好友」里找TA聊天。';
+}
+function scheduleTrialIfNeeded(){
+  if(S.trialIdx < TRIALS.length && S.trained >= TRIALS[S.trialIdx] && S.trialDay===null){
+    const wait = (1+R(3))*TICK;
+    S.trialDay = S.day + wait;
+    addLog('训练量够了，教练：'+wait+'天后又有选拔赛，别松劲。', true);
+  }
+}
+/* 老朋友（好感≥50）比赛后寄明信片 */
+function palPostcard(){
+  const pals = S.friends.filter(f=>(f.stage||0)>=1);
+  if(!pals.length || Math.random()>=0.5) return;
+  const f = pick(pals);
+  if(f.intl){
+    const loc = INT_LOCS.find(l=>l.city===f.city);
+    gainItem('card', f.city, loc ? loc.country : f.city);
+  }else{
+    gainItem('card', f.city);
+  }
+  addLog(f.name+'从'+f.city+'寄来一张明信片：「想你了，赛道上见。」', true);
+}
+
+/* ================= 转行事件 ================= */
+function offerRetire(){
+  if(S.day < 25 || S.over) return;
+  const chance = S.talent < 55 ? 0.035 : 0.008;
+  if(Math.random() >= chance) return;
+  showModal('另一个世界',
+    '有人看了你的比赛，递来一张名片：<b>「游泳很苦，要不要考虑一条更轻松的路？」</b><br><br>天赋有限，练到今天，进步也越来越慢了。要不要转行？',
+    [
+      {label:'再坚持一下', cb:()=>{ addLog('你想了想，还是放不下泳池。这条路再走一段。', true); }},
+      {label:'转行吧', cb:gameOver}
+    ]);
+}
+function gameOver(){
+  S.over = true;
+  addLog('手账停在了这一天。'+S.name+'离开了泳池。', true);
+  if(!S.endings.farewell){ S.endings.farewell = true; addLog('达成结局「水里的事，再与我无关」。', true); }
+  save();
+  const m = S.medals;
+  const e = ENDINGS.find(x=>x.id==='farewell');
+  _mq.push({t:e.t, b:'<img class="pcImg" src="'+e.img+'" onerror="pcImgFail(this)"><div class="pcCap">'+e.t+'</div>'+e.b.replace(/\{name\}/g, S.name)});
+  _mq.push({t:'手 账 之 后', b:'泳池生涯 · '+Math.ceil(S.day/30)+' 个月<br>累计训练量 '+S.trained+'<br>奖牌 🥇'+m.gold+' 🥈'+m.silver+' 🥉'+m.bronze+'<br>朋友 '+S.friends.length+' 人<br><br>那片水，会记得TA来过。', btns:[{label:'重新翻开一本手账', cb:resetGame}]});
+  flushMilestones();
+}
+
+/* ================= 国际赛事 ================= */
+function offerInternational(){
+  if(S.over) return;
+  if(S.trialIdx < TRIALS.length || S.intCount > 0) return;
+  if(S.trained < TRIALS[TRIALS.length-1] + 200) return;
+  if(Math.random() >= 0.06) return;
+  const meet = pick(INT_MEETS);
+  const loc = pick(INT_LOCS);
+  let rivals = [88, 104];
+  let isOlympic = false;
+  if(Math.random() < 0.15){ meet = '奥运会'; rivals = [94, 106]; isOlympic = true; }
+  S.intCount++;
+  showModal('国 际 邀 请',
+    '一封从<b>'+loc.city+'</b>（'+loc.country+'）寄来的邀请函：<b>'+meet+'</b>'+(isOlympic?'。<br><br><b>这是奥运会。</b>全世界的目光都在这里。':'。<br><br>全世界的快泳手都会去。你的名字，也在名单上。')+'<br><br>去吗？',
+    [
+      {label:'去！', cb:()=>runIntMeet(meet, loc.city, loc.country, rivals)},
+      {label:'这次先不了', cb:()=>{ S.intCount = 0; addLog('婉拒了'+city+'的邀请，先把国内的路走稳。'); }}
+    ]);
+}
+function runIntMeet(meet, city, country, rivals){
+  rivals = rivals || [88, 104];
+  const mine = S.talent*0.35 + S.tech*0.30 + S.strength*0.15 + S.diligence*0.10 + (100-S.fatigue)*0.10 + R(24)-12
+    + (S.suitBuff?12:0) - (S.meetDistract?10:0);
+  if(S.suitBuff){ S.suitBuff=false; addLog('竞速泳衣贴身如肤，划水都利落了几分。', true); }
+  S.meetDistract = false;
+  let better = 0;
+  for(let i=0;i<7;i++){
+    const rv = rivals[0] + Math.random()*(rivals[1]-rivals[0]);
+    if(rv > mine) better++;
+  }
+  const rank = better+1;
+  let medalTxt = '', rankTxt = '第'+rank+'名';
+  if(rank===1){ S.medals.gold++; medalTxt='🥇 金牌'; }
+  else if(rank===2){ S.medals.silver++; medalTxt='🥈 银牌'; }
+  else if(rank===3){ S.medals.bronze++; medalTxt='🥉 铜牌'; }
+  S.meets.push({day:S.day, city, name:meet+' · 国际', rank});
+  addLog(meet+'（'+city+'）：'+rankTxt+(medalTxt?'，'+medalTxt:'')+'。', true);
+  if(Math.random() < 0.40) gainItem('card', city, country);
+  else if(Math.random() < 0.30) gainItem(pick(GENERICS));
+  palPostcard();
+  checkEndings();
+
+  let extra = '';
+  [0.8, 0.6, 0.4].forEach(ch=>{ if(Math.random() < ch){ const e = makeFriend(city, true); if(e) extra += e; } });
+  showModal(meet, city+'的水深比家里深。<br><br>'+S.name+'拿到了<b>'+rankTxt+'</b>'+(medalTxt?'，'+medalTxt:'')+'。'+extra);
+  if(meet==='奥运会' && rank===1){ unlockEnding('champion'); }
+  S.intCount = 0;
+  save();
+}
+
+/* ================= 微信风聊天 + 送礼 ================= */
+
+/* ================= 像素泳道小人 ================= */
+const cv = document.createElement('canvas');
+cv.id = 'laneCv'; cv.width = 480; cv.height = 72;
+const cx = cv.getContext('2d');
+let laneP = 0, laneTarget = 0;   // 0~1 泳道位置（运行时）
+let laneMode = {type:'water', until:0};
+const SCALE = 2;
+function px(x,y,w,h,c){ cx.fillStyle=c; cx.fillRect(Math.round(x)*SCALE, Math.round(y)*SCALE, w*SCALE, h*SCALE); }
+function attachLane(){
+  const row = document.getElementById('laneRow');
+  if(row && cv.parentElement !== row){ row.innerHTML=''; row.appendChild(cv); }
+}
+function skinC(){ return '#ffd9b3'; }
+function suitC(){ return S && S.gender==='m' ? '#5aa8cc' : '#e8798a'; }
+function hairC(){ return S && S.gender==='m' ? '#3a2a20' : '#7a4a2b'; }
+
+/* 俯视自由泳，面向右；frame: 0/1 换臂 */
+function drawSwim(frame, x, y){
+  const skin = skinC(), suit = suitC(), hair = hairC();
+  // 打腿水花
+  const ks = frame===0 ? 1 : -1;
+  px(x-12, y-5+ks, 3, 2, 'rgba(255,255,255,.55)');
+  px(x-12, y+3-ks, 3, 2, 'rgba(255,255,255,.55)');
+  // 身体（泳衣）
+  px(x-8, y-5, 16, 10, suit);
+  px(x-9, y-3, 18, 6, suit);
+  // 头 + 头发
+  px(x+8, y-5, 10, 10, skin);
+  if(S && S.gender==='f'){ px(x+8, y-6, 10, 12, hair); px(x+13, y-4, 5, 8, skin); px(x-4, y-3, 12, 6, hair); }
+  else { px(x+8, y-6, 10, 6, hair); px(x+8, y-6, 4, 12, hair); }
+  // 划水臂
+  if(frame===0){ px(x+17, y-2, 15, 4, skin); px(x-20, y-2, 12, 4, skin); px(x+32, y-3, 3, 6, 'rgba(255,255,255,.75)'); }
+  else { px(x+10, y-8, 12, 4, skin); px(x-22, y+2, 14, 4, skin); px(x-22, y+4, 3, 5, 'rgba(255,255,255,.55)'); }
+}
+/* 站姿正面（撸铁 / 陆上动作共用）；y = 脚底基线；Q版短身比例；pose: 0 抱铃/垂臂， 1 平举， 2 举过头顶 */
+function drawStand(pose, x, y, withBar){
+  const skin = skinC(), suit = suitC(), hair = hairC();
+  // 头发（后层，女生长发垂到肩）
+  px(x, y-14, 10, 3, hair);
+  if(S && S.gender==='f'){ px(x-1, y-12, 3, 7, hair); px(x+8, y-12, 3, 7, hair); }
+  // 头
+  px(x, y-13, 10, 8, skin);
+  if(S && S.gender==='m'){ px(x-1, y-14, 12, 5, hair); }
+  // 身体
+  px(x-4, y-5, 18, 7, suit);
+  // 腿 + 鞋
+  px(x-2, y+2, 6, 5, skin); px(x+8, y+2, 6, 5, skin);
+  px(x-3, y+7, 8, 3, suit); px(x+7, y+7, 8, 3, suit);
+  // 杠铃 / 手臂
+  if(withBar){
+    const barY = pose===0 ? y-8 : (pose===1 ? y-11 : y-14);
+    px(x-13, barY, 36, 3, '#cfd8dc');
+    px(x-17, barY-3, 5, 9, '#37474f'); px(x+22, barY-3, 5, 9, '#37474f');
+    px(x-13, barY-1, 4, 5, skin); px(x+19, barY-1, 4, 5, skin);
+  }else{
+    if(pose===0){ px(x-8, y-5, 4, 8, skin); px(x+14, y-5, 4, 8, skin); }
+    else if(pose===1){ px(x-18, y-8, 12, 4, skin); px(x+16, y-8, 12, 4, skin); }
+    else { px(x-12, y-15, 4, 9, skin); px(x+18, y-15, 4, 9, skin); }
+  }
+}
+function drawLane(ts){
+  cx.clearRect(0, 0, 480, 56);
+  cx.imageSmoothingEnabled = false;
+  const inGym = laneMode.type==='gym' && ts < laneMode.until;
+  const inTech = laneMode.type==='tech' && ts < laneMode.until;
+  const inSleep = laneMode.type==='sleep' && ts < laneMode.until;
+  if(inSleep){ drawSleep(ts); return; }
+  if(inGym || inTech){
+    // 陆上：地板 + 哑铃架剪影
+    cx.fillStyle='rgba(8,30,44,.45)'; cx.fillRect(0,0,480,72);
+    px(0, 31, 240, 1, 'rgba(255,255,255,.12)');
+    px(24, 14, 3, 16, 'rgba(255,255,255,.14)'); px(24, 12, 10, 3, 'rgba(255,255,255,.14)');
+    px(170, 16, 3, 14, 'rgba(255,255,255,.10)'); px(170, 14, 9, 3, 'rgba(255,255,255,.10)');
+    const pose = Math.floor(ts/300) % 3;
+    if(inGym) drawStand(pose, 110, 27, true);
+    else drawStand(pose, 110, 27, false);
+    cx.fillStyle='rgba(242,251,253,.55)';
+    cx.font='12px sans-serif';
+    cx.fillText(inGym ? '陆上力量 · 撸铁中' : '陆上技术 · 动作练习', 300, 26);
+    return;
+  }
+  // 水面泳道
+  cx.fillStyle='rgba(180,230,244,.10)'; cx.fillRect(0,0,480,72);
+  // 泳道线（虚线，中线）
+  cx.fillStyle='rgba(255,255,255,.30)';
+  for(let x=6; x<468; x+=18){ cx.fillRect(x, 35, 9, 2); }
+  // 分道线绳点
+  cx.fillStyle='rgba(255,255,255,.22)';
+  for(let x=0; x<480; x+=12){ cx.fillRect(x, 2, 5, 3); cx.fillRect(x, 67, 5, 3); }
+  // 位置趋近
+  laneP += (laneTarget - laneP) * 0.06;
+  const sx = 26 + laneP * 176;
+  const bob = Math.sin(ts/240) * 1.2;
+  const strokeFast = Math.abs(laneTarget - laneP) > 0.01;
+  const frame = Math.floor(ts / (strokeFast ? 140 : 500)) % 2;
+  drawSwim(frame, sx, 18 + bob);
+  // 水泡
+  const bx = (sx - 40 - (ts/40)%60 + 480) % 480;
+  cx.fillStyle='rgba(255,255,255,.25)';
+  cx.fillRect(bx, 52, 3, 3); cx.fillRect(bx+14, 58, 2, 2);
+}
+function laneLoop(ts){
+  if(cv.isConnected) drawLane(ts);
+  requestAnimationFrame(laneLoop);
+}
+requestAnimationFrame(laneLoop);
+function laneSwim(){
+  let nt = laneTarget + 0.18;
+  if(nt >= 1){ S.laps = (S.laps||0) + 1; nt = 0; laneP = 0; toast('游完一整趟，转身！第 '+S.laps+' 趟'); }
+  laneTarget = nt;
+  S.swimX = nt;
+}
+function laneLand(type){
+  laneMode = {type, until: performance.now() + (type==='sleep' ? 3200 : 2600)};
+}
+/* 睡觉动画：夜晚、躺着的小人、Zzz */
+function drawSleep(ts){
+  cx.fillStyle='rgba(5,22,38,.55)'; cx.fillRect(0,0,480,72);
+  cx.imageSmoothingEnabled = false;
+  // 月亮 + 闪爈的星星
+  px(424, 10, 6, 6, 'rgba(255,236,180,.95)'); px(420, 13, 14, 4, 'rgba(255,236,180,.95)');
+  const stars = [[40,12],[92,24],[160,10],[248,18],[330,14],[378,28]];
+  cx.fillStyle='rgba(255,255,255,.6)';
+  stars.forEach((s,i)=>{ if(Math.floor(ts/600)%2 === i%2) cx.fillRect(s[0], s[1], 3, 3); });
+  // 床垫
+  px(78, 42, 122, 8, 'rgba(255,255,255,.16)');
+  px(78, 40, 10, 10, 'rgba(255,255,255,.22)');
+  // 躺着的小人（头在右，闭眼）
+  const skin = skinC(), suit = suitC(), hair = hairC();
+  px(106, 36, 44, 8, suit);
+  px(98, 37, 8, 6, suit);
+  px(150, 34, 14, 9, skin);
+  if(S && S.gender==='f'){ px(150, 32, 14, 4, hair); px(162, 32, 4, 11, hair); px(108, 32, 40, 4, hair); }
+  else { px(150, 32, 14, 4, hair); }
+  px(122, 32, 10, 4, skin);
+  // Zzz 飘动
+  const zoff = Math.floor(ts/350)%3;
+  cx.fillStyle='rgba(242,251,253,.85)';
+  cx.font='11px sans-serif'; cx.fillText('z', 168, 30 - zoff*5);
+  cx.font='14px sans-serif'; cx.fillText('Z', 180, 24 - zoff*5);
+  cx.fillStyle='rgba(242,251,253,.5)';
+  cx.font='12px sans-serif'; cx.fillText('休息中 · 恢复体力', 290, 26);
+}
+
+/* ================= 好友聊天（微信风） / 送礼 ================= */
+function chatWith(i){
+  if((S.chats||0) >= chatLimit()){ toast('今天聊得够多啦，明天再找TA'); return; }
+  const f = S.friends[i];
+  const AVC = ['#e8a0a8','#8fbcd9','#9ecf9a','#c9a8d9','#e8c08a','#a0c4e8'];
+  const favC = AVC[i % AVC.length];
+  const topic = pick(CHAT_TOPICS);
+  const opts = topic.opts.slice().sort(()=>Math.random()-0.5);
+  const msgs = [];
+  function bub(av, avc, me, text){
+    return '<div class="wxRow'+(me?' me':'')+'"><div class="wxAv" style="background:'+avc+'">'+av+'</div><div class="bub">'+text+'</div></div>';
+  }
+  function draw(ended){
+    const foot = (ended && st.lastD !== undefined)
+      ? '<div style="text-align:center;font-size:11px;color:#8a8a8a;margin-top:8px">好感度 '+(st.lastD>0?'+':'')+st.lastD+' · 当前 '+f.aff+'</div>' : '';
+    const optsHtml = ended ? '<button class="wxEnd" onclick="closeModal()">收起聊天</button>'
+      : opts.map((o,k)=>'<button class="wxOpt" onclick="wxReply('+i+','+k+')">'+o[0]+'</button>').join('');
+    showModal('与 '+f.name+' 聊天',
+      '<div class="wxChat"><div class="wxMsgs">'+msgs.join('')+'</div><div class="wxOpts">'+optsHtml+'</div></div>'+foot, []);
+  }
+  const st = window._wxState = { i, f, favC, msgs, bub, draw, opts, lastD:undefined };
+  msgs.push(bub(f.name.charAt(0), favC, false, topic.open.replace(/\{city\}/g, f.city).replace(/\{name\}/g, f.name)));
+  draw(false);
+}
+function wxReply(i, k){
+  const st = window._wxState;
+  if(!st || st.i !== i) return;
+  const f = st.f;
+  const pair = st.opts[k];
+  const d = pair[1];
+  st.msgs.push(st.bub((S.name||'我').charAt(0), '#7bc86c', true, pair[0]));
+  st.msgs.push(st.bub(f.name.charAt(0), st.favC, false, pick(d===3?RE_3:(d===1?RE_1:RE_M1))));
+  f.aff = Math.max(0, (f.aff||0) + d);
+  st.lastD = d;
+  S.chats = (S.chats||0) + 1;
+  addLog('和'+f.name+'聊天，好感度 '+(d>0?'+':'')+d+'（当前 '+f.aff+'）。');
+  save(); checkAffStage(f); render();
+  st.draw(true);
+}
+function closeModal(){ $('modal').classList.remove('on'); flushMilestones(); }
+function gainItem(id, place, country){
+  let key, icon, name, desc;
+  if(place){
+    key = id+'@'+place;
+    if(id==='card'){ icon='🏙️'; name=place+'明信片'; desc='背面盖着'+place+'的邮戳'; }
+    else{ icon='🧸'; name=place+'吉祥物'; desc='从'+place+'抱回来的赛事吉祥物'; }
+  }else{
+    const s = SOUVENIRS.find(x=>x.id===id);
+    key=id; icon=s.icon; name=s.name; desc=s.desc;
+  }
+  S.items[key] = (S.items[key]||0)+1;
+  let lit = '';
+  if(place){
+    const scope = country ? 'intl' : 'cn';
+    const dk = country || place;
+    if(!S.dex[scope][dk]){ S.dex[scope][dk]=true; lit = ' · 图鉴点亮 '+(country||place); }
+  }
+  addLog('拾到纪念品：'+icon+' '+name+'。', true);
+  toast(icon+' 获得 · '+name+lit);
+  checkDexRewards();
+}
+function itemInfo(key){
+  const at = key.indexOf('@');
+  if(at<0){ const s = SOUVENIRS.find(x=>x.id===key); return s ? {icon:s.icon, name:s.name, desc:s.desc} : {icon:'🎁', name:key, desc:''}; }
+  const id = key.slice(0,at), place = key.slice(at+1);
+  if(id==='card'){
+    const ph = photoOf(place);
+    return {icon:'🏙️', name:place+'明信片', desc:(ph?('背面印着'+ph.name):'背面盖着'+place+'的邮戳'), place};
+  }
+  return {icon:'🧸', name:place+'吉祥物', desc:'从'+place+'抱回来的赛事吉祥物', place};
+}
+/* 图鉴 / 收藏点击查看大图 */
+function tapDex(scope, key){
+  if(scope==='cn'){
+    if(!S.dex.cn[key]){ toast('还没点亮'+key+'，去那里比一场吧'); return; }
+    viewPhoto(key, key+' · 明信片');
+  }else{
+    if(!S.dex.intl[key]){ toast('还没点亮'+key+'，国际赛场上见'); return; }
+    viewPhoto(key, key+' · 明信片');
+  }
+}
+function tapItem(key){
+  const info = itemInfo(key);
+  if(info.place){ viewPhoto(info.place, info.name+' ×'+S.items[key]); }
+  else showModal(info.name, '<div class="pcBig">'+info.icon+'</div><div class="pcCap">×'+S.items[key]+' · '+info.desc+'</div>');
+}
+function viewPhoto(place, title){
+  const ph = photoOf(place);
+  if(!ph || !ph.url){ showModal(title, '<div class="pcBig">🏙️</div><div class="pcCap">'+(ph?ph.name:place)+'的风景，等你亲自去看</div>'); return; }
+  const m = ph.url.match(/\/thumb\/(.+)\/(\d+)px-/);
+  const path = m ? m[1] : '';
+  const cur = m ? m[2]+'px' : '';
+  const alts = ['500px','960px','330px','1280px'].filter(w=>w!==cur).join(',');
+  showModal(title, '<img class="pcImg" src="'+imgUrl(ph.url)+'" data-path="'+path+'" data-alts="'+alts+'" onerror="pcImgFail(this)"><div class="pcCap">'+ph.name+'</div>');
+}
+function pcImgFail(el){
+  const alts = (el.dataset.alts||'').split(',').filter(Boolean);
+  const path = el.dataset.path||'';
+  if(path && alts.length){
+    const next = alts.shift();
+    el.dataset.alts = alts.join(',');
+    el.src = 'https://wsrv.nl/?url=upload.wikimedia.org/wikipedia/commons/thumb/' + path + '/' + next + '-' + path.split('/').pop();
+    return;
+  }
+  const d = document.createElement('div');
+  d.className = 'pcBig'; d.textContent = '🏙️';
+  el.replaceWith(d);
+}
+function checkDexRewards(){
+  if(!S.rewards.cn && CITIES.every(c=>S.dex.cn[c])){
+    S.rewards.cn = true;
+    S.diligence = clamp(S.diligence+5, 0, 100);
+    S.trained += 100;
+    addLog('集齐了二十座城市的明信片——「山河邮戳」达成！勤奋 +5，训练量 +100。', true);
+    showModal('山 河 邮 戳', '抽屉里的明信片攒了<b>二十座城市</b>。<br><br>从哈尔滨到海口，每一张背面都有邮戳。<br><br>奖励：勤奋 +5 · 训练量 +100');
+  }
+  if(!S.rewards.intl && INT_LOCS.every(l=>S.dex.intl[l.country])){
+    S.rewards.intl = true;
+    S.talent = clamp(S.talent+3, 0, 100);
+    S.globalMult = (S.globalMult||1) + 0.05;
+    addLog('二十个国家的泳池都留下过水花——「五洲行者」达成！天赋 +3，永久训练效果 +5%。', true);
+    showModal('五 洲 行 者', '二十个国家的泳池都留下过你的水花。<br><br>奖励：天赋 +3 · 永久训练效果 +5%');
+  }
+}
+function giftTo(i){
+  const f = S.friends[i];
+  const keys = Object.keys(S.items);
+  if(!keys.length){ toast('还没有纪念品，训练和比赛时会有机会拾到'); return; }
+  const stageGift = (f.stage||0)>=2 ? 4 : 3;
+  const rows = keys.map(key=>{
+    const base = key.split('@')[0];
+    const info = itemInfo(key);
+    const isFav = (f.fav||[]).includes(base);
+    return '<div class="giftRow"><span>'+(isFav?'<span class="heart">❤️</span>':'')+info.icon+' '+info.name+' ×'+S.items[key]+'<span style="color:var(--ink-soft);font-size:12px;margin-left:8px">好感 '+(isFav?'+'+stageGift:'+1')+'</span></span><button class="chatBtn" onclick="giftItem('+i+',\''+key+'\')">送 出</button></div>';
+  }).join('');
+  showModal('送礼物 · '+f.name, '<div>'+rows+'</div><div class="hint">❤️ 是TA最喜欢的，好感 +'+stageGift+'；其他 +1</div>');
+}
+function giftItem(i, key){
+  const f = S.friends[i];
+  const info = itemInfo(key);
+  S.items[key]--;
+  if(S.items[key] <= 0) delete S.items[key];
+  const isFav = (f.fav||[]).includes(key.split('@')[0]);
+  const gain = isFav ? ((f.stage||0)>=2 ? 4 : 3) : 1;
+  f.aff = (f.aff||0) + gain;
+  addLog('把'+info.name+'送给了'+f.name+'，好感度 +'+gain+'。', true);
+  save(); checkAffStage(f); render();
+  showModal('送 出 去',
+    f.name+(isFav ? '眼睛一下就亮了：' : '笑着说：')+'「'+pick(GIFT_THANKS)+'」<br><br>好感度 +'+gain+'（当前 '+f.aff+'）'+(isFav?'<br><span style="font-size:12px;color:var(--ink-soft)">这正是TA最想要的</span>':''));
+}
+
+/* ================= 手账 / 存档 ================= */
+function addLog(text, ev){
+  S.log.unshift({d:S.day, t:text, ev:!!ev});
+  if(S.log.length>120) S.log.pop();
+}
+function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){} }
+function load(){
+  try{ const raw = localStorage.getItem(SAVE_KEY); if(raw){ S = JSON.parse(raw);
+    if(S.chats===undefined) S.chats=0;
+    if(S.swimX===undefined) S.swimX=0;
+    if(S.laps===undefined) S.laps=0;
+    if(!S.gender) S.gender='f';
+    if(!S.items) S.items={};
+    if(!S.dex) S.dex={cn:{}, intl:{}};
+    if(!S.rewards) S.rewards={};
+    if(!S.buffDay) S.buffDay=0;
+    if(!S.globalMult) S.globalMult=1;
+    if(!S.restStreak) S.restStreak=0;
+    if(!S.startAge) S.startAge = S.age;
+    if(!S.gear) S.gear={};
+    if(!S.tapeUntil) S.tapeUntil=0;
+    if(!S.roster) S.roster = buildRoster();
+    if(!S.metIdx) S.metIdx=[];
+    if(!S.endings) S.endings={};
+    if(S.friends) S.friends.forEach(f=>{ if(!f.fav) f.fav = SOUVENIRS.slice().sort(()=>Math.random()-0.5).slice(0,2).map(s=>s.id); if(!f.stage) f.stage=0; });
+    return true; } }catch(e){}
+  return false;
+}
+
+/* ================= 渲染 ================= */
+const $ = id => document.getElementById(id);
+function render(){
+  if(!S) return;
+  $('screenCreate').style.display='none';
+  $('screenGame').style.display='block';
+  $('hName').textContent = S.name;
+  $('hSub').textContent = '第 '+monthOf(S.day)+' 月 · '+S.age+' 岁 · 累计训练量 '+S.trained;
+  $('hTraits').innerHTML = S.traits.map(t=>{
+    const d = TRAITS.find(x=>x.id===t);
+    return '<span class="trait" title="'+d.desc+'">'+d.name+'</span>';
+  }).join('');
+
+  const bars = [
+    {lb:'勤奋', v:S.diligence, cls:''},
+    {lb:'健康', v:S.health, cls:'hp'},
+    {lb:'天赋', v:S.talent, cls:''},
+    {lb:'技术', v:S.tech, cls:''},
+    {lb:'力量', v:S.strength, cls:''}
+  ];
+  const rowHtml = b=>'<div class="barRow"><span class="lb">'+b.lb+'</span><span class="bar '+b.cls+'"><i style="width:'+Math.round(b.v)+'%"></i></span><span class="num">'+Math.round(b.v)+'</span></div>';
+  const barHtml = rowHtml(bars[0]) + rowHtml(bars[1]) + '<div class="laneRow" id="laneRow"></div>' + bars.slice(2).map(rowHtml).join('') +
+  '<div class="barRow"><span class="lb">疲惫</span><span class="bar fat"><i style="width:'+S.fatigue+'%"></i></span><span class="num">'+S.fatigue+'</span></div>' +
+  '<div class="barRow"><span class="lb">训练量</span><span class="bar"><i style="width:'+trialProgress()+'%"></i></span><span class="num">'+trialLabel()+'</span></div>' +
+  '<div class="barRow"><span class="lb">单日上限</span><span class="bar"><i style="width:'+(talentCap()/22*100)+'%"></i></span><span class="num">+'+Math.round(talentCap())+'</span></div>' +
+  '<div class="barRow"><span class="lb">阶段</span><span style="font-size:12px;color:var(--ink-soft)"><b style="color:var(--accent);font-weight:normal">'+ageStage().name+'</b> · '+ageStage().note+'</span></div>';
+  $('attrBars').innerHTML = barHtml;
+  attachLane();
+  $('sickBadge').innerHTML = S.sick ? '<span class="badgeSick">生病中 · 训练效果大打折扣</span>' : '';
+
+  $('dayNum').textContent = monthOf(S.day);
+  $('dayOfMonth').textContent = dayOfM(S.day);
+  const fatNote = S.fatigue>=80 ? ' · 非常疲惫' : (S.fatigue>=50?' · 有点累':'');
+  $('actions').innerHTML =
+    '<button class="act" onclick="doAction(\'main\')"><div class="t">主课训练</div><div class="d">累计训练量，冲击选拔赛'+fatNote+'</div></button>' +
+    '<button class="act" onclick="doAction(\'tech\')"><div class="t">技术课</div><div class="d">打磨转身、出发与水感</div></button>' +
+    '<button class="act" onclick="doAction(\'strength\')"><div class="t">力量课</div><div class="d">陆上体能，比赛的后半程靠它</div></button>' +
+    '<button class="act" onclick="doAction(\'rest\')"><div class="t">休息</div><div class="d">降低疲惫，恢复健康</div></button>' +
+    (S.sick ? '<button class="act wide actTreat" onclick="doAction(\'treat\')"><div class="t">去看医生</div><div class="d">病好了才能好好训练</div></button>' : '');
+
+  $('logList').innerHTML = S.log.map(l=>
+    '<div class="logItem'+(l.ev?' ev':'')+'"><span class="d">'+fmtD(l.d)+'</span>'+l.t+'</div>'
+  ).join('') || '<div class="hint">还没有记录。</div>';
+
+  $('friendList').innerHTML = S.friends.length
+    ? S.friends.map((f,i)=>'<div class="friendCard"><div class="fi"><div class="fn">'+f.name+'<span class="city">'+f.city+'</span>'+(f.stage?'<span class="stageTag">'+AFF_STAGES[f.stage-1].name+'</span>':'')+'</div><div class="fq">'+f.quirk+'</div><div class="fa">好感度 '+(f.aff||0)+' · 心动好物 <span class="heart">❤️</span>'+((f.fav||[]).map(id=>{const s=SOUVENIRS.find(x=>x.id===id);return s?s.icon:'';}).join(''))+'</div></div><div style="display:flex;flex-direction:column;gap:6px;"><button class="chatBtn" onclick="chatWith('+i+')">聊 天</button><button class="chatBtn" onclick="giftTo('+i+')">送礼物</button></div></div>').join('')
+    : '<div class="hint">还没有朋友。去大城市比赛，会认识别的地区的人。</div>';
+  $('friendHint').textContent = S.friends.length ? ('已结识 '+S.metIdx.length+'/'+S.roster.length+' 人 · 好友们让训练效果 +'+(Math.round(Math.min(S.friends.length,10)*(has('sj')?0.3:0.2)*100)/10)+'% · 今天还能聊 '+(chatLimit()-(S.chats||0))+' 次') : '还没有朋友。去大城市比赛，会认识别的地区的人。';
+  $('friendHint').title = '好感 50/80/100 会开启关系进阶：老朋友寄明信片 → 知己（聊天上限+1、送礼+4） → 并肩的人（训练加成翻倍）';
+
+  $('mGold').textContent = S.medals.gold;
+  $('mSilver').textContent = S.medals.silver;
+  $('mBronze').textContent = S.medals.bronze;
+  $('meetList').innerHTML = S.meets.length
+    ? S.meets.slice().reverse().map(m=>'<div class="meetItem">'+fmtD(m.day)+' · <b>'+m.name+'</b>（'+m.city+'）· '+m.rank+'名</div>').join('')
+    : '<div class="hint">还没有比赛记录。</div>';
+  $('endList').innerHTML = ENDINGS.map(e=>{
+    const got = S.endings[e.id];
+    return '<div class="meetItem" style="'+(got?'color:var(--good)':'opacity:.55')+'">'+(got?'🏆':'🔒')+' <b>'+e.t+'</b> · '+e.hint+'</div>';
+  }).join('');
+
+  const keys = Object.keys(S.items);
+  $('itemList').innerHTML = keys.length
+    ? '<div class="itemGrid">'+keys.map(key=>{const info=itemInfo(key);return '<div class="itemCard" onclick="tapItem(\''+key+'\')"><div class="ic">'+info.icon+'</div><div class="nm">'+info.name+'</div><div class="ct">×'+S.items[key]+' · '+info.desc+'</div></div>';}).join('')+'</div>'
+    : '<div class="hint">还没有纪念品。训练和比赛时有概率拾到。</div>';
+  $('itemHint').textContent = keys.length ? '明信片和吉祥物带着掉落地的名字；纪念品可以收藏，也可以送给好友——投其所好，好感翻三倍' : '';
+  renderGear();
+  renderDex();
+}
+function renderGear(){
+  if(!$('gearList')) return;
+  const owned = GEAR.filter(g=>S.gear[g.id]);
+  $('gearList').innerHTML = owned.length
+    ? '<div class="itemGrid">'+owned.map(g=>'<div class="itemCard"><div class="ic">'+g.icon+'</div><div class="nm">'+g.name+' ×'+S.gear[g.id]+'</div><div class="ct">'+g.desc+'</div><button class="chatBtn" style="margin-top:10px" onclick="useGear(\''+g.id+'\')">使 用</button></div>').join('')+'</div>'
+    : '<div class="hint">还没有道具。比赛日场馆门口的赞助商摊位有售。</div>';
+}
+function useGear(id){
+  if(!S.gear[id]) return;
+  const g = GEAR.find(x=>x.id===id);
+  S.gear[id]--; if(S.gear[id] <= 0) delete S.gear[id];
+  let msg = '';
+  if(id==='suit'){ S.suitBuff=true; msg='竞速泳衣收进了装备包——下一场比赛它会替你快零点几秒。'; addLog('换上了竞速泳衣（下一场比赛发挥 +12）。', true); }
+  else if(id==='gel'){ S.gelBuff=true; msg='能量胶提在手里，下一堂主课见真章。'; addLog('能量胶备用（下次主课训练效果 ×2）。', true); }
+  else if(id==='drink'){ S.fatigue=clamp(S.fatigue-25,0,100); msg='一口闷，肩背的酸胀消下去一大半。'; addLog('喝了恢复饮料（疲惫 -25）。', true); }
+  else if(id==='tape'){ S.tapeUntil=S.day+30; msg='肩膀和大腿都贴好了，接下来一个月放心游。'; addLog('贴好了肌效贴（30 天内不会抽筋）。', true); }
+  else if(id==='salt'){ S.health=clamp(S.health+10,0,100); msg='电解质下去，整个人都精神了。'; addLog('电解质片下肚（健康 +10）。', true); }
+  save(); render();
+  showModal('道 具 生 效', g.icon+' <b>'+g.name+'</b><br><br>'+msg);
+}
+function renderDex(){
+  if(!$('dexList')) return;
+  const cnCnt = CITIES.filter(c=>S.dex.cn[c]).length;
+  const intlCnt = INT_LOCS.filter(l=>S.dex.intl[l.country]).length;
+  const cn = CITIES.map(c=>'<div class="dexCell'+(S.dex.cn[c]?' on':'')+'" onclick="tapDex(\'cn\',\''+c+'\')"><div class="di">'+(S.dex.cn[c]?'🏙️':'·')+'</div><div class="dn">'+c+'</div></div>').join('');
+  const intl = INT_LOCS.map(l=>'<div class="dexCell'+(S.dex.intl[l.country]?' on':'')+'" onclick="tapDex(\'intl\',\''+l.country+'\')"><div class="di">'+(S.dex.intl[l.country]?'🌍':'·')+'</div><div class="dn">'+l.country+'</div></div>').join('');
+  $('dexList').innerHTML =
+    '<div class="dexTitle">国 内 城 市 · '+cnCnt+'/'+CITIES.length+'</div><div class="dexGrid">'+cn+'</div>'+
+    '<div class="dexTitle">国 际 国 家 · '+intlCnt+'/'+INT_LOCS.length+'</div><div class="dexGrid">'+intl+'</div>'+
+    '<div class="dexReward">'+
+    (S.rewards.cn ? '✅ 山河邮戳已达成 · 勤奋 +5 · 训练量 +100' : '🔒 集齐国内 '+CITIES.length+' 城明信片 → 「山河邮戳」奖励') +
+    (S.rewards.intl ? '<br>✅ 五洲行者已达成 · 天赋 +3 · 永久训练效果 +5%' : '<br>🔒 集齐 '+INT_LOCS.length+' 国纪念品 → 「五洲行者」奖励') +
+    '</div>';
+}
+function trialProgress(){
+  if(S.trialIdx >= TRIALS.length) return 100;
+  const lo = S.trialIdx===0 ? 0 : TRIALS[S.trialIdx-1];
+  const hi = TRIALS[S.trialIdx];
+  return clamp((S.trained-lo)/(hi-lo)*100, 0, 100);
+}
+function trialLabel(){
+  if(S.trialIdx >= TRIALS.length) return 'MAX';
+  return S.trained+'/'+TRIALS[S.trialIdx];
+}
+
+/* ================= 弹层 / 杂项 ================= */
+function showModal(title, body, buttons){
+  $('mdTitle').textContent = title;
+  $('mdBody').innerHTML = body;
+  const box = $('mdBtns');
+  box.innerHTML = '';
+  const bs = buttons || [{label:'知道了'}];
+  bs.forEach(b=>{
+    const el = document.createElement('button');
+    el.className = 'btn small';
+    el.textContent = b.label;
+    el.onclick = () => { $('modal').classList.remove('on'); if(b.cb) b.cb(); if(S && !S.over) render(); flushMilestones(); };
+    box.appendChild(el);
+  });
+  $('modal').classList.add('on');
+}
+function toast(t){
+  const el = $('toast');
+  el.textContent = t; el.classList.add('on');
+  setTimeout(()=>el.classList.remove('on'), 1800);
+}
+function resetGame(){
+  localStorage.removeItem(SAVE_KEY);
+  S = null;
+  $('modal').classList.remove('on');
+  $('screenGame').style.display='none';
+  $('screenCreate').style.display='block';
+}
+document.querySelectorAll('.gBtn').forEach(el=>{
+  el.onclick = ()=>{
+    document.querySelectorAll('.gBtn').forEach(x=>x.classList.remove('on'));
+    el.classList.add('on');
+  };
+});
+document.querySelectorAll('.tab').forEach(el=>{
+  el.onclick = ()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('on'));
+    el.classList.add('on');
+    $('panel-'+el.dataset.tab).classList.add('on');
+  };
+});
+$('btnStart').onclick = ()=>{
+  const name = $('inName').value.trim();
+  const age = parseInt($('inAge').value, 10);
+  const gender = document.querySelector('.gBtn.on').dataset.g;
+  if(!name){ toast('先给TA取个名字吧'); return; }
+  if(!age || age<8 || age>40){ toast('年龄填 8 - 40 之间'); return; }
+  newGame(name, age, gender);
+  render();
+  const d0 = S.traits.map(t=>TRAITS.find(x=>x.id===t));
+  const stg = ageStage();
+  showModal('开 营 日', '「'+name+'」入队了。<br><br>随机生成的性格特征：<br><b>'+d0[0].name+'</b> · '+d0[0].desc+'<br><b>'+d0[1].name+'</b> · '+d0[1].desc+'<br><br>年龄阶段：<b>'+stg.name+'</b> · '+stg.note);
+};
+$('btnReset').onclick = ()=>{
+  if(confirm('确定要重新开始吗？当前手账会被撕掉。')) resetGame();
+};
+
+/* ================= 启动 ================= */
+if(load()){
+  laneP = S.swimX || 0; laneTarget = laneP;
+  render();
+  if(S.over){
+    gameOver();
+  }
+}
+</script>
+</body>
+</html>
