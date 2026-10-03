@@ -136,6 +136,14 @@
   .logItem{padding:12px 2px;border-bottom:1px dashed var(--line);font-size:13.5px;}
   .logItem .d{color:var(--ink-soft);font-size:12px;margin-right:10px;}
   .logItem.ev{color:var(--accent);}
+  .logPager{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:16px;}
+  .pgBtn{
+    min-width:32px;height:28px;padding:0 8px;border-radius:6px;cursor:pointer;
+    border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);
+    color:var(--paper);font-family:inherit;font-size:12px;
+  }
+  .pgBtn:hover{background:rgba(255,255,255,.18);}
+  .pgBtn.on{background:var(--accent);border-color:var(--accent);color:#083048;}
 
   .friendCard{padding:16px 4px;border-bottom:1px dashed var(--line);display:flex;align-items:center;justify-content:space-between;gap:14px;}
   .favatar{width:36px;height:45px;image-rendering:pixelated;flex-shrink:0;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:6px;}
@@ -1759,6 +1767,28 @@ function wxReply(i, k){
   }, 1150);
 }
 function closeModal(){ sfx('page'); $('modal').classList.remove('on'); flushMilestones(); }
+/* 手账分页：每页 10 条，页码可点 */
+let _logPage = 0;
+function renderLog(){
+  const per = 10;
+  const total = Math.max(1, Math.ceil(S.log.length/per));
+  if(_logPage >= total) _logPage = total-1;
+  if(_logPage < 0) _logPage = 0;
+  const seg = S.log.slice(_logPage*per, _logPage*per+per);
+  let html = seg.map(l=>
+    '<div class="logItem'+(l.ev?' ev':'')+'"><span class="d">'+fmtD(l.d)+'</span>'+l.t+'</div>'
+  ).join('') || '<div class="hint">还没有记录。</div>';
+  if(total > 1){
+    html += '<div class="logPager">';
+    for(let p=0;p<total;p++){
+      html += '<button class="pgBtn'+(p===_logPage?' on':'')+'" onclick="goLogPage('+p+')">'+(p+1)+'</button>';
+    }
+    html += '</div>';
+  }
+  $('logList').innerHTML = html;
+}
+function goLogPage(p){ sfx('tap'); _logPage = p; renderLog(); }
+
 function gainItem(id, place, country){
   sfx('sparkle');
   let key, icon, name, desc;
@@ -1965,9 +1995,7 @@ function render(){
     '<button class="act" onclick="doAction(\'rest\')"><div class="t">休息</div><div class="d">降低疲惫，恢复健康</div></button>' +
     (S.sick ? '<button class="act wide actTreat" onclick="doAction(\'treat\')"><div class="t">去看医生</div><div class="d">病好了才能好好训练</div></button>' : '');
 
-  $('logList').innerHTML = S.log.map(l=>
-    '<div class="logItem'+(l.ev?' ev':'')+'"><span class="d">'+fmtD(l.d)+'</span>'+l.t+'</div>'
-  ).join('') || '<div class="hint">还没有记录。</div>';
+  renderLog();
 
   $('friendList').innerHTML = S.friends.length
     ? S.friends.map((f,i)=>'<div class="friendCard"><canvas class="favatar" width="12" height="15" data-fi="'+i+'"></canvas><div class="fi"><div class="fn">'+f.name+'<span class="city">'+f.city+'</span>'+(f.stage?'<span class="stageTag">'+AFF_STAGES[f.stage-1].name+'</span>':'')+'</div><div class="fq">'+f.quirk+'</div><div class="fa">好感度 '+(f.aff||0)+' · 心动好物 <span class="heart">❤️</span>'+((f.fav||[]).map(id=>{const s=SOUVENIRS.find(x=>x.id===id);return s?s.icon:'';}).join(''))+'</div></div><div style="display:flex;flex-direction:column;gap:6px;"><button class="chatBtn" onclick="chatWith('+i+')">聊 天</button><button class="chatBtn" onclick="giftTo('+i+')">送礼物</button></div></div>').join('')
