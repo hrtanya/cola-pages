@@ -227,6 +227,8 @@
     position:fixed;inset:0;display:none;align-items:center;justify-content:center;
     background:rgba(4,32,46,.45);z-index:50;
   }
+  /* 从设置里打开的玩法说明：要盖在设置弹窗上层 */
+  #modal.above{z-index:58;}
   #modal.on{display:flex;}
   #setModal{
     position:fixed;inset:0;display:none;align-items:center;justify-content:center;
@@ -305,6 +307,7 @@
     <div class="field"><label>肤 色</label><div class="pickRow" id="pickSkin"></div></div>
     <button class="btn" id="btnStart">翻 开 手 账</button>
     <button class="gBtn" id="btnHistory">回 看 手 账</button>
+    <button class="gBtn" id="btnResume" style="display:none">继 续 手 账</button>
     <div class="hint">性格特征会在开局时随机生成，影响TA的整个运动生涯</div>
     <div class="credit">© 花染 · 本作品由本人使用 AI 独立设计并制作</div>
   </section>
@@ -338,6 +341,7 @@
       <div class="tab" data-tab="gear">道具</div>
       <div class="tab" data-tab="dex">图鉴</div>
       <div class="tab" data-tab="medals">战绩</div>
+      <div class="tab" data-tab="ach">成就</div>
     </div>
 
     <div class="panel on" id="panel-log"><div id="logList"></div></div>
@@ -353,6 +357,7 @@
       <div id="gearList"></div>
       <div class="hint" id="gearHint">道具在比赛时从赞助商摊位购得——买装备会分心，但特殊功能关键时刻能救命。</div>
     </div>
+    <div class="panel" id="panel-ach"><div id="achList"></div></div>
     <div class="panel" id="panel-dex">
       <div id="dexList"></div>
       <div class="hint">图鉴按足迹点亮：拿到哪座城市、哪个国家的纪念品，就点亮哪里。</div>
@@ -387,6 +392,10 @@
     <button class="btn small" id="btnSaveNow">保 存 进 度</button>
     <button class="btn small" id="btnSetClose">关 闭</button>
   </div>
+  <div style="display:flex;gap:10px;justify-content:center;margin-top:10px;flex-wrap:wrap;">
+    <button class="btn small" id="btnHelp">玩 法 说 明</button>
+    <button class="btn small" id="btnHome">回 到 首 页</button>
+  </div>
 </div></div>
 <div id="modal"><div class="modalCard"><div class="mt" id="mdTitle"></div><div class="mb" id="mdBody"></div><div id="mdBtns"></div></div></div>
 <div id="swimGame"><div class="sgCard"><div class="sgTitle" id="sgTitle">决 赛 · 划 水 节 奏</div><div class="sgFan" id="sgFan"><canvas id="fanCv" width="60" height="14"></canvas><span id="sgFanName"></span></div><div class="sgSub" id="sgSub">在白线滑进绿色区域时按「划水」</div><div class="sgBar"><div class="sgZone" id="sgZone"></div><div class="sgCore"></div><div class="sgNeedle" id="sgNeedle"></div></div><button class="btn sgTap" id="sgTap" onclick="sgTap()">划 水 ！</button><div class="sgDots" id="sgDots"></div></div></div>
@@ -416,38 +425,57 @@ const INT_LOCS = [
   {city:'蒙特利尔',country:'加拿大'},{city:'里约热内卢',country:'巴西'},{city:'墨尔本',country:'澳大利亚'},{city:'开罗',country:'埃及'}
 ];
 const INT_MEETS = ['世界游泳锦标赛','亚运会','游泳世界杯分站赛','奥运会游泳测试赛'];
+const INT_RIVALS = {'世界游泳锦标赛':[100,114],'亚运会':[92,106],'游泳世界杯分站赛':[96,110],'奥运会游泳测试赛':[98,112],'奥运会':[106,120]};
 /* 结局图鉴 */
+/* 结局（全部强制结束生涯）与成就（解锁后生涯继续） */
 const ENDINGS = [
-  {id:'champion', t:'世界冠军之路', img:'assets/end-champion.png', hint:'参加奥运会，并站上最高领奖台',
+  {id:'champion', t:'世界冠军之路', img:'assets/end-champion.png', hint:'在奥运会站上最高领奖台，光荣退役',
    b:'从省队的小泳池到奥运会的最高领奖台，<b>{name}</b>把名字写进了历史。<br><br>水面之下没人看见的那些年，都在这一秒的浪花里。'},
-  {id:'brothers', t:'四海皆兄弟', img:'assets/end-brothers.png', hint:'结识所有人物（国内每城 5 人 · 国际每国 10 人）',
-   b:'通讯录里存满了来自世界各地的名字。<br><br>每一座城市、每一个国家，都有人对<b>{name}</b>说：「赛道上见。」<br><br>泳池把世界连在了一起。'},
   {id:'farewell', t:'水里的事，再与我无关', img:'assets/end-farewell.png', hint:'选择转行，离开泳池',
    b:'收起泳镜的那天，<b>{name}</b>回头看了一眼空荡的泳池。<br><br>水声停在了身后，路在前面。'},
-  {id:'home', t:'泳池已是故乡', img:'assets/end-home.png', hint:'游到 32 岁，仍在坚持',
-   b:'32 岁，很多人早就不游了，而<b>{name}</b>还在日出前下水。<br><br>泳池不再是梦想的起点，而是生活本身。'},
-  {id:'golds', t:'金牌收藏家', img:'assets/end-golds.png', hint:'累计获得 15 枚金牌',
-   b:'十五枚金牌，抽屉早就关不上了。<br><br>但每次戴上其中任何一枚，<b>{name}</b>的心跳还是会快半拍。'},
-  {id:'streak', t:'不败传说', draw:true, hint:'连续 8 场比赛都拿金牌',
-   b:'八场比赛，八次冲线，没有一次例外。<br><br>后来大家看比赛，不是为了猜谁赢——<b>{name}</b>下水的时候，答案就已经写好了。'},
-  {id:'grand', t:'山河与五洲', draw:true, hint:'集齐国内 20 城 + 国际 20 国图鉴',
-   b:'抽屉里塞满了二十座城市的邮戳，相册里夹着二十个国家的明信片。<br><br><b>{name}</b>把整个世界，游成了自家的后院。'},
-  {id:'squad', t:'并肩作战', draw:true, hint:'5 位好友的好感都达到 100',
-   b:'一个人的泳池是修行，一群人的泳池是节日。<br><br>五个愿意在清晨五点陪<b>{name}</b>站在池边的人——这比任何金牌都难得。'},
-  {id:'veteran', t:'常青树', draw:true, hint:'累计参加 30 场比赛',
-   b:'很多年过去，对手换了一荋又一荋，只有<b>{name}</b>还在出发台上。<br><br>热爱这件事，从来不需要退役。'},
-  {id:'injury', t:'我还不想离开', draw:true, img:'assets/end-injury.png', hint:'生病或疲惫透支累计 8 次，身体先说了再见',
-   b:'医生的话很轻，落在耳朵里却很重。<br><br><b>{name}</b>还站在泳池边，手心贴着池边的瓷砖——<br><br>「我还不想离开。」<br><br>水花停了，热爱没有。'}
+  {id:'injury', t:'我还不想离开', draw:true, img:'assets/end-injury.png', hint:'疲惫拉满 100 达 4 次，身体先说了再见',
+   b:'医生的话很轻，落在耳朵里却很重。<br><br><b>{name}</b>还站在泳池边，手心贴着池边的瓷砖——<br><br>「我还不想离开。」<br><br>水花停了，热爱没有。'},
+  {id:'cut', t:'名单上没有我', draw:true, hint:'连续两次队内考核不达标，被筛出队伍',
+   b:'公告栏的名单换了一茬又一茬，这一次，上面没有<b>{name}</b>。<br><br>收拾柜子的那天，队友们都没怎么说话。<br><br>泳池还在，只是从此换一种方式路过它。'},
+  {id:'retire40', t:'四十岁的浪', draw:true, hint:'游到 40 岁，时间到了',
+   b:'规则写着：40 岁，该上岸了。<br><br><b>{name}</b>把泳镜挂上池边的钩子，摆正，又摸了一下。<br><br>「下一辈子，还游。」'}
 ];
+const ACH = [
+  {id:'home',    t:'泳池已是故乡', hint:'游到 32 岁，仍在坚持'},
+  {id:'golds',   t:'金牌收藏家',   hint:'累计获得 15 枚金牌'},
+  {id:'streak',  t:'不败传说',     hint:'连续 10 场比赛都拿金牌'},
+  {id:'grand',   t:'山河与五洲',   hint:'集齐国内 20 城 + 国际 20 国图鉴'},
+  {id:'squad',   t:'并肩作战',     hint:'5 位好友的好感都达到 100'},
+  {id:'brothers',t:'四海皆兄弟',   hint:'结识所有人物（国内每城 5 人 · 国际每国 10 人）'},
+  {id:'veteran', t:'常青树',       hint:'累计参加 30 场比赛'}
+];
+function unlockAch(id){
+  S.ach = S.ach || {};
+  if(S.ach[id]) return;
+  S.ach[id] = true;
+  sfx('chime');
+  const a = ACH.find(x=>x.id===id);
+  addLog('达成成就「'+a.t+'」。', true);
+  save();
+  toast('🏆 成就解锁 · '+a.t);
+}
+function renderAch(){
+  const n = ACH.filter(a=>S.ach && S.ach[a.id]).length;
+  $('achList').innerHTML = '<div class="hint" style="margin-bottom:6px">已解锁 '+n+' / '+ACH.length+' · 成就不结束生涯，结局才会。</div>'
+    + ACH.map(a=>{
+      const got = S.ach && S.ach[a.id];
+      return '<div class="meetItem" style="text-align:left;'+(got?'':'opacity:.5;')+'">'+(got?'🏆':'✧')+' <b>'+a.t+'</b>'+(got?'':'<br><span style="font-size:12px;color:var(--ink-soft)">'+a.hint+'</span>')+'</div>';
+    }).join('');
+}
 const SURNAMES = ['林','陈','周','沈','顾','韩','杨','许','秦','姜','薛','方','程','叶','苏','魏','江','赵'];
 const GIVEN = ['屿','聿','知遥','晚舟','斯年','与安','照野','叙白','南絮','亦航','清晏','闻笛','舒扬','之涣','沐晴','望舒','北辰','海蓝','星回','可蓝'];
 const QUIRKS = ['总在赛后给对手递水','怕水呛，但动作最标准','会背整张泳道表','比赛前必听同一首歌','收集各地的泳池门票','说梦话都在打腿','从不看成绩榜，只看秒表','给每个对手起外号','赢了会请全队吃冰','认定你会站上领奖台'];
 const MEET_TIERS = [
-  {name:'城市邀请赛', rivals:[38,52]},
-  {name:'省锦标赛', rivals:[52,66]},
-  {name:'全国大学生游泳锦标赛', rivals:[64,80]},
-  {name:'全国冠军赛', rivals:[76,92]},
-  {name:'国家队选拔赛', rivals:[86,100]}
+  {name:'城市邀请赛', rivals:[40,55]},
+  {name:'省锦标赛', rivals:[58,73]},
+  {name:'全国大学生游泳锦标赛', rivals:[72,87]},
+  {name:'全国冠军赛', rivals:[84,97]},
+  {name:'国家队选拔赛', rivals:[94,108]}
 ];
 const TRIALS = [60, 180, 400, 700];
 const CHAT_TOPICS = [
@@ -578,17 +606,33 @@ function drawEndArt(id){
     P(36,61,18,12,suitC()); P(40,73,5,4,skinC()); P(46,73,5,4,skinC()); P(38,77,6,3,'#e8e2d0');
     P(41,53,8,2,'#ffffff');
     P(10,30,2,44,'#9a9a9a'); P(6,28,10,6,'#e8f4ff'); P(8,30,6,3,'rgba(120,190,220,.8)');
+  } else if(id==='cut'){
+    // 更衣室：长凳、柜门、收拾好的包
+    for(let y=0;y<120;y++) P(0,y,160,1, y<84?'#7a6a58':'#5a4c3e');
+    for(let i2=0;i2<5;i2++){ P(10+i2*30,20,24,58,'#4a5a6a'); P(10+i2*30,20,24,4,'#3a4654'); P(21+i2*30,46,4,8,'#c9c2b2'); }
+    P(18,84,124,8,'#8a6a4a'); P(24,92,6,16,'#5a4636'); P(130,92,6,16,'#5a4636');
+    P(64,70,18,12,'#c96a6a'); P(70,66,6,5,'#8a5a4a'); // 凳上的包
+    person(108,60,'#8a8a8a','#3a2a20'); // 灰衣的人要走了
+    P(0,108,160,12,'#4a3e32');
+  } else if(id==='retire40'){
+    // 清晨的泳池，灰发的背影
+    sky('#2a3550','#3d4a6b'); stars(20);
+    for(let y=70;y<120;y++) P(0,y,160,1, y<90?'#1d4e6b':'#173d54');
+    P(18,36,6,64,'#5a6a7a'); P(18,36,22,4,'#5a6a7a');
+    person(78,62,'#d8d8d8','#9a9a9a');
+    P(70,76,42,2,'rgba(255,255,255,.3)');
+    for(let x=8;x<160;x+=14){ P(x,98,6,2,'rgba(255,255,255,.18)'); }
   }
   return c.toDataURL('image/png');
 }
 function checkEndings(){
-  if(S.medals.gold >= 15) unlockEnding('golds');
-  if(S.roster && S.metIdx.length >= S.roster.length) unlockEnding('brothers');
-  if(S.age >= 32 && !S.over) unlockEnding('home');
-  if((S.goldStreak||0) >= 8) unlockEnding('streak');
-  if(S.rewards.cn && S.rewards.intl) unlockEnding('grand');
-  if(S.friends.filter(f=>(f.aff||0)>=100).length >= 5) unlockEnding('squad');
-  if(S.meets.length >= 30) unlockEnding('veteran');
+  if(S.medals.gold >= 15) unlockAch('golds');
+  if(S.roster && S.metIdx.length >= S.roster.length) unlockAch('brothers');
+  if(S.age >= 32 && !S.over) unlockAch('home');
+  if((S.goldStreak||0) >= 10) unlockAch('streak');
+  if(S.rewards.cn && S.rewards.intl) unlockAch('grand');
+  if(S.friends.filter(f=>(f.aff||0)>=100).length >= 5) unlockAch('squad');
+  if(S.meets.length >= 30) unlockAch('veteran');
 }
 
 /* ================= 状态 ================= */
@@ -786,6 +830,7 @@ function finishMain(mult){
     let gain = (10 + S.diligence*0.10 + R(6)) * mult * fatigueMult() * growthMult() * ageStage().gain * dip;
     if(S.buffDay===S.day) gain *= 1.5;
     let gelNote = '';
+    if(S.coachUntil && S.day <= S.coachUntil) gain *= 1.2; // 好友陪练：聊天独有
     if(S.gelBuff){ gain *= 2; S.gelBuff=false; gelNote = '（能量胶生效，效果翻倍）'; }
     const cramp = tapeActive() ? false : Math.random() < 0.07;
     if(cramp){ gain *= 0.5; S.fatigue = clamp(S.fatigue+4, 0, 100); }
@@ -1138,14 +1183,14 @@ function afterAction(kind){
   }
   if(S.sick) S.health = clamp(S.health-3, 0, 100);
   if(S.sick) S.sickCount = (S.sickCount||0)+1;
-  if(S.fatigue >= 90) S.burnCount = (S.burnCount||0)+1;
+  if(S.fatigue >= 100) S.burn100 = (S.burn100||0)+1;
   // 伤病预警：还差两次就提前终结生涯时提醒一次
-  if(!S.warnedInjury && (S.sickCount||0)+(S.burnCount||0) >= 6){
+  if(!S.warnedInjury && (S.burn100||0) >= 2){
     S.warnedInjury = true;
     sfx('sad');
     addLog('队医把你叫到一边：身体已经亮黄灯了。', true);
     showModal('身 体 警 报',
-      '队医把你叫到一边，眉头拧着：「最近生病和透支的次数，太多了。」<br><br>「再这样硬扛下去，<b>身体会先于梦想撙下去的</b>——只还有两次机会了。」<br><br><span style="font-size:12px;color:var(--ink-soft)">多休息，照顾好自己。生涯不能重来。</span>');
+      '队医把你叫到一边，眉头拧着：「疲惫拉满 <b>100</b> 已经 <b>'+(S.burn100||0)+'</b> 次了。」<br><br>「再硬扛两次，身体会先于梦想撂下去的——<b>拉满 4 次，生涯就到这</b>。」<br><br><span style="font-size:12px;color:var(--ink-soft)">多休息，照顾好自己。生涯不能重来。</span>');
   }
   // 训练中偶尔拾到纪念品
   if(kind!=='treat' && Math.random() < 0.05){
@@ -1159,6 +1204,16 @@ function afterAction(kind){
   if(na > S.age){ S.age = na; addLog('过了个生日——'+S.age+' 岁了，生日愿望是游得再快一点。', true); }
   checkEndings();
   careerEndCheck();
+  // 40 岁：规则请你上岸
+  if(!S.over && S.age >= 40){
+    addLog('40 岁了。规则写着：该上岸了。', true);
+    forceEnd('retire40');
+    save(); render(); return;
+  }
+  // 队内考核：每 120 天一个周期，训练量不达标会被筛出队伍
+  if(!S.assess) S.assess = { next: S.day + 120, last: S.trained, warned: false };
+  if(!S.over && S.day >= S.assess.next) runAssessment();
+  if(S.over){ save(); render(); return; }
   randomEvent();
   scheduleTrial();
   offerTrial();
@@ -1168,6 +1223,33 @@ function afterAction(kind){
   offerInternational();
   save();
   render();
+}
+/* ===== 队内考核：训练量不达标就淘汰 ===== */
+function assessNeed(){
+  const base = 130 + S.trialIdx*70;
+  const agePen = S.age > 23 ? Math.round((S.age-23)*4) : 0;
+  return Math.round((base + agePen) * (S.assess && S.assess.warned ? 1.2 : 1));
+}
+function runAssessment(){
+  const got = S.trained - (S.assess.last==null ? 0 : S.assess.last);
+  const need = assessNeed();
+  S.assess.next = S.day + 120;
+  S.assess.last = S.trained;
+  if(got >= need){
+    S.assess.warned = false;
+    addLog('队内考核：本周期训练量 '+got+'（标准 '+need+'），达标。', true);
+    toast('📋 队内考核通过 · 训练量 +'+got);
+  } else if(!S.assess.warned){
+    S.assess.warned = true;
+    sfx('sad');
+    addLog('队内考核未达标：训练量 '+got+'/'+need+'。教练给了最后一个周期。', true);
+    showModal('队 内 考 核',
+      '教练把考核表折起来，敲了敲你的柜门：<br><br>「这个周期训练量 <b>'+got+'</b>，标准是 <b>'+need+'</b>。」<br><br>「队里不养闲人。下一个周期再不达标，<b>你就得把柜子腾出来了</b>——而且标准还会提高两成。」<br><br><span style="font-size:12px;color:var(--ink-soft)">120 天后重新考核，累计训练量的涨幅是唯一标准。</span>');
+  } else {
+    addLog('连续两次队内考核不达标，你被筛出了队伍。', true);
+    forceEnd('cut');
+  }
+  save();
 }
 /* 休息滑坡：连续休息后训练效果下降 */
 function restDip(){
@@ -1345,7 +1427,8 @@ function offerSponsor(tier, city){
 }
 function runMeet(tier, city){
   S.meetDay = null;
-  const fan = (S.friends.length && Math.random()<0.5) ? pick(S.friends) : null;
+  const closeFs = S.friends.filter(f=>(f.stage||0)>=3);
+  const fan = closeFs.length ? pick(closeFs) : ((S.friends.length && Math.random()<0.5) ? pick(S.friends) : null);
   openSwimGame(hits=>runMeetResult(tier, city, hits, fan), {rounds:8});
 }
 /* 好友到场观赛：赛后一句台词，好感 +1 */
@@ -1355,12 +1438,12 @@ function fanLine(fan, rank){
   const say = win ? pick(['太帅了！我就说你可以！','看台第一排，看得手心都是汗！','拿了个牌！晚上请你吃饭！'])
                   : pick(['没关系，下次我还在。','你出发的样子已经很帅了。','走，吃点好的，别复盘了。']);
   fan.aff = Math.min(100,(fan.aff||0)+1); checkAffStage(fan);
-  return '<br><br>看台上的<b>'+fan.name+'</b>喊得最大声：「'+say+'」';
+  return '<br><br>看台上的<b>'+fan.name+'</b>喊得最大声：「'+say+'」<span style="font-size:12px;color:var(--ink-soft)">（好友到场，本场发挥 +5）</span>';
 }
 function runMeetResult(tier, city, hits, fan){
   const bonus = hits*2 - 8;
-  const mine = S.talent*0.35 + S.tech*0.30 + S.strength*0.15 + S.diligence*0.10 + (100-S.fatigue)*0.10 + R(24)-12 + bonus
-    + (S.suitBuff?12:0) - (S.meetDistract?10:0);
+  const mine = S.talent*0.35 + S.tech*0.30 + S.strength*0.15 + S.diligence*0.10 + (100-S.fatigue)*0.10 + R(14)-7 + bonus
+    + (S.suitBuff?12:0) + (fan?5:0) - (S.meetDistract?10:0);
   if(S.suitBuff){ S.suitBuff=false; addLog('竞速泳衣贴身如肤，划水都利落了几分。', true); }
   S.meetDistract = false; S.sponsorAsked = false;
   let better = 0;
@@ -1442,18 +1525,28 @@ function offerRetire(){
       {label:'转行吧', cb:gameOver}
     ]);
 }
-function gameOver(){
+/* 强制结束：结局 = 生涯到此为止（champion/farewell/injury/cut/retire40） */
+function forceEnd(id, extraLine){
   S.over = true;
-  addLog('手账停在了这一天。'+S.name+'离开了泳池。', true);
-  if(!S.endings.farewell){ S.endings.farewell = true; addLog('达成结局「水里的事，再与我无关」。', true); }
-  recordHistory('farewell');
+  const win = (id==='champion');
+  sfx(win ? 'win' : 'sad');
+  if(!S.endings[id]) S.endings[id] = true;
+  addLog('生涯结束——达成结局「'+ENDINGS.find(x=>x.id===id).t+'」。', true);
+  recordHistory(id);
   save();
   const m = S.medals;
-  const e = ENDINGS.find(x=>x.id==='farewell');
-  _mq.push({t:e.t, b:'<img class="pcImg" src="'+e.img+'" onerror="pcImgFail(this)"><div class="pcCap">'+e.t+'</div>'+e.b.replace(/\{name\}/g, S.name)});
-  _mq.push({t:'手 账 之 后', b:'泳池生涯 · '+Math.ceil(S.day/30)+' 个月<br>累计训练量 '+S.trained+'<br>奖牌 🥇'+m.gold+' 🥈'+m.silver+' 🥉'+m.bronze+'<br>朋友 '+S.friends.length+' 人<br><br>那片水，会记得TA来过。', btns:[{label:'重新翻开一本手账', cb:resetGame}]});
+  const e = ENDINGS.find(x=>x.id===id);
+  const useFile = !!e.img;
+  const src = useFile ? e.img : drawEndArt(id);
+  const errAttr = useFile ? (e.draw ? ' onerror="this.onerror=null;this.src=drawEndArt(\''+id+'\')"' : ' onerror="pcImgFail(this)"') : '';
+  _mq.push({t:'结 局 · '+e.t,
+    b:'<img class="pcImg pixImg" src="'+src+'"'+errAttr+'><div class="pcCap">'+e.t+'</div>'+(extraLine?extraLine+'<br><br>':'')+e.b.replace(/\{name\}/g, S.name)});
+  _mq.push({t:'手 账 之 后',
+    b:'泳池生涯 · '+Math.ceil(S.day/30)+' 个月<br>累计训练量 '+S.trained+'<br>奖牌 🥇'+m.gold+' 🥈'+m.silver+' 🥉'+m.bronze+'<br>朋友 '+S.friends.length+' 人<br>成就 '+ACH.filter(a=>S.ach&&S.ach[a.id]).length+' / '+ACH.length+'<br><br>'+(id==='injury'?'不是不想游，是身体先说了再见。':(id==='farewell'?'那片水，会记得TA来过。':(id==='champion'?'掌声落下，TA把最好的年纪留给了泳池。':'手账合上了，泳池记得每一个认真游过的人。'))),
+    btns:[{label:'重新翻开一本手账', cb:resetGame}]});
   flushMilestones();
 }
+function gameOver(){ forceEnd('farewell'); }
 
 /* 历史手账：结束一段生涯时存档，首页可回看 */
 function recordHistory(endingId){
@@ -1476,22 +1569,9 @@ function showHistory(){
 /* 结局：我还不想离开——伤病透支，职业生涯提前结束 */
 function careerEndCheck(){
   if(S.over) return;
-  if((S.sickCount||0) + (S.burnCount||0) >= 8) careerEnd();
+  if((S.burn100||0) >= 4) careerEnd();
 }
-function careerEnd(){
-  S.over = true;
-  sfx('sad');
-  const sc = S.sickCount||0, bc = S.burnCount||0;
-  addLog('医生合上病历：身体已经不允许再游了。', true);
-  if(!S.endings.injury){ S.endings.injury = true; addLog('达成结局「我还不想离开」。', true); }
-  recordHistory('injury');
-  save();
-  const m = S.medals;
-  const e = ENDINGS.find(x=>x.id==='injury');
-  _mq.push({t:e.t, b:'<img class="pcImg pixImg" src="assets/end-injury.png" onerror="this.onerror=null;this.src=drawEndArt(\'injury\')"><div class="pcCap">'+e.t+'</div>'+e.b.replace(/\{name\}/g, S.name)});
-  _mq.push({t:'手 账 之 后', b:'泳池生涯 · '+Math.ceil(S.day/30)+' 个月<br>累计训练量 '+S.trained+'<br>奖牌 🥇'+m.gold+' 🥈'+m.silver+' 🥉'+m.bronze+'<br>朋友 '+S.friends.length+' 人<br>生病 '+sc+' 次 · 累到极限 '+bc+' 次<br><br>不是不想游，是身体先说了再见。', btns:[{label:'重新翻开一本手账', cb:resetGame}]});
-  flushMilestones();
-}
+function careerEnd(){ forceEnd('injury'); }
 
 /* ================= 国际赛事 ================= */
 function offerInternational(){
@@ -1501,9 +1581,9 @@ function offerInternational(){
   if(Math.random() >= 0.06) return;
   const meet = pick(INT_MEETS);
   const loc = pick(INT_LOCS);
-  let rivals = [88, 104];
+  let rivals = INT_RIVALS[meet] || [100,114];
   let isOlympic = false;
-  if(Math.random() < 0.15){ meet = '奥运会'; rivals = [94, 106]; isOlympic = true; }
+  if(Math.random() < 0.15){ meet = '奥运会'; rivals = INT_RIVALS['奥运会']; isOlympic = true; }
   S.intCount++;
   openEnvelope(meet==='奥运会' ? '奥 运 会 邀 请' : '国 际 邀 请',
     '一封从<b>'+loc.city+'</b>（'+loc.country+'）寄来的邀请函：<b>'+meet+'</b>'+(isOlympic?'。<br><br><b>这是奥运会。</b>全世界的目光都在这里。':'。<br><br>全世界的快泳手都会去。你的名字，也在名单上。')+'<br><br>去吗？',
@@ -1511,15 +1591,16 @@ function offerInternational(){
     ()=>{ S.intCount = 0; addLog('婉拒了'+loc.city+'的邀请，先把国内的路走稳。'); });
 }
 function runIntMeet(meet, city, country, rivals){
-  rivals = rivals || [88, 104];
-  const fan = (S.friends.length && Math.random()<0.5) ? pick(S.friends) : null;
+  rivals = rivals || INT_RIVALS[meet] || [100,114];
+  const closeFs = S.friends.filter(f=>(f.stage||0)>=3);
+  const fan = closeFs.length ? pick(closeFs) : ((S.friends.length && Math.random()<0.5) ? pick(S.friends) : null);
   openSwimGame(hits=>runIntMeetResult(meet, city, country, rivals, hits, fan), {rounds:8});
 }
 function runIntMeetResult(meet, city, country, rivals, hits, fan){
-  rivals = rivals || [88, 104];
+  rivals = rivals || INT_RIVALS[meet] || [100,114];
   const bonus = hits*2 - 8;
-  const mine = S.talent*0.35 + S.tech*0.30 + S.strength*0.15 + S.diligence*0.10 + (100-S.fatigue)*0.10 + R(24)-12 + bonus
-    + (S.suitBuff?12:0) - (S.meetDistract?10:0);
+  const mine = S.talent*0.35 + S.tech*0.30 + S.strength*0.15 + S.diligence*0.10 + (100-S.fatigue)*0.10 + R(14)-7 + bonus
+    + (S.suitBuff?12:0) + (fan?5:0) - (S.meetDistract?10:0);
   if(S.suitBuff){ S.suitBuff=false; addLog('竞速泳衣贴身如肤，划水都利落了几分。', true); }
   S.meetDistract = false;
   let better = 0;
@@ -1544,7 +1625,7 @@ function runIntMeetResult(meet, city, country, rivals, hits, fan){
   [0.8, 0.6, 0.4].forEach(ch=>{ if(Math.random() < ch){ const e = makeFriend(city, true); if(e) extra += e; } });
   const bonusTxt = '<span style="font-size:12px;color:var(--ink-soft)">（划水节奏 '+hits+'/8，发挥'+(bonus>=0?'+':'')+bonus+'）</span>';
   showModal(meet, city+'的水深比家里深。<br><br>'+bonusTxt+'<br><br>'+S.name+'拿到了<b>'+rankTxt+'</b>'+(medalTxt?'，'+medalTxt:'')+'。'+fanLine(fan, rank)+extra);
-  if(meet==='奥运会' && rank===1){ unlockEnding('champion'); }
+  if(meet==='奥运会' && rank===1){ forceEnd('champion'); }
   S.intCount = 0;
   save();
 }
@@ -1764,11 +1845,26 @@ function wxReply(i, k){
     st.lastD = d;
     S.chats = (S.chats||0) + 1;
     addLog('和'+f.name+'聊天，抽到「'+pair[0].slice(0,10)+'…」，好感度 '+(d>0?'+':'')+(d===0?'±0':d)+'（当前 '+f.aff+'）。');
+    if(d > 0){
+      // 好友独有加成：只有聊天能拿到
+      if((f.stage||0) >= 1 && Math.random() < 0.5){
+        S.coachUntil = S.day + 30;
+        addLog('和'+f.name+'下水陪练了半小时，未来 30 天训练效果 +20%。');
+        toast('🤝 陪练加成 · 30 天训练效果 +20%');
+        sfx('sparkle');
+      }
+      if((f.stage||0) >= 2 && Math.random() < 0.3){
+        S.talent = clamp(S.talent+1, 0, 100);
+        addLog(f.name+'点拨了一个压箱底的技术细节，天赋 +1。', true);
+        toast('💡 知己点拨 · 天赋 +1');
+        sfx('sparkle');
+      }
+    }
     save(); checkAffStage(f); render();
     st.draw();
   }, 1150);
 }
-function closeModal(){ sfx('page'); $('modal').classList.remove('on'); flushMilestones(); }
+function closeModal(){ sfx('page'); $('modal').classList.remove('on'); $('modal').classList.remove('above'); flushMilestones(); }
 /* 手账分页：每页 10 条，页码可点 */
 let _logPage = 0;
 function renderLog(){
@@ -1790,6 +1886,28 @@ function renderLog(){
   $('logList').innerHTML = html;
 }
 function goLogPage(p){ sfx('tap'); _logPage = p; renderLog(); }
+
+/* 好友分页：每页 6 张卡，页码可点（同手账翻页） */
+let _frPage = 0;
+function renderFriends(){
+  const per = 6;
+  const list = S.friends;
+  const total = Math.max(1, Math.ceil(list.length/per));
+  if(_frPage >= total) _frPage = total-1;
+  if(_frPage < 0) _frPage = 0;
+  const seg = list.slice(_frPage*per, _frPage*per+per);
+  let html = seg.length ? seg.map((f,k)=>{
+    const i = _frPage*per+k;
+    return '<div class="friendCard"><canvas class="favatar" width="12" height="15" data-fi="'+i+'"></canvas><div class="fi"><div class="fn">'+f.name+'<span class="city">'+f.city+'</span>'+(f.stage?'<span class="stageTag">'+AFF_STAGES[f.stage-1].name+'</span>':'')+'</div><div class="fq">'+f.quirk+'</div><div class="fa">好感度 '+(f.aff||0)+' · 心动好物 <span class="heart">❤️</span>'+((f.fav||[]).map(id=>{const s=SOUVENIRS.find(x=>x.id===id);return s?s.icon:'';}).join(''))+'</div></div><div style="display:flex;flex-direction:column;gap:6px;"><button class="chatBtn" onclick="chatWith('+i+')">聊 天</button><button class="chatBtn" onclick="giftTo('+i+')">送礼物</button></div></div>';
+  }).join('') : '<div class="hint">还没有朋友。去大城市比赛，会认识别的地区的人。</div>';
+  if(total > 1){
+    html += '<div class="logPager">';
+    for(let p=0;p<total;p++) html += '<button class="pgBtn'+(p===_frPage?' on':'')+'" onclick="goFrPage('+p+')">'+(p+1)+'</button>';
+    html += '</div>';
+  }
+  $('friendList').innerHTML = html;
+}
+function goFrPage(p){ sfx('tap'); _frPage = p; renderFriends(); }
 
 function gainItem(id, place, country){
   sfx('sparkle');
@@ -1921,6 +2039,15 @@ function giftItem(i, key){
   const gain = isFav ? ((f.stage||0)>=2 ? 4 : 3) : 1;
   f.aff = (f.aff||0) + gain;
   addLog('把'+info.name+'送给了'+f.name+'，好感度 +'+gain+'。', true);
+  if((f.stage||0) >= 1 && Math.random() < 0.35){
+    // 好友回礼：不用去赞助商摊位，也不分心
+    const back = pick(['drink','salt','tape','gel']);
+    S.gear[back] = (S.gear[back]||0)+1;
+    const gi = GEAR.find(x=>x.id===back);
+    addLog(f.name+'转身塞给你一样回礼：'+gi.icon+' '+gi.name+'。', true);
+    toast('🎁 好友回礼 · '+gi.name);
+    sfx('gift');
+  }
   save(); checkAffStage(f); render();
   showModal('送 出 去',
     f.name+(isFav ? '眼睛一下就亮了：' : '笑着说：')+'「'+pick(GIFT_THANKS)+'」<br><br>好感度 +'+gain+'（当前 '+f.aff+'）'+(isFav?'<br><span style="font-size:12px;color:var(--ink-soft)">这正是TA最想要的</span>':''));
@@ -1942,6 +2069,11 @@ function load(){
     if(!S.dex) S.dex={cn:{}, intl:{}};
     if(!S.rewards) S.rewards={};
     if(!S.buffDay) S.buffDay=0;
+    if(!S.ach) S.ach = {};
+    ACH.forEach(a=>{ if(S.endings && S.endings[a.id]) S.ach[a.id] = true; });
+    if(!S.assess) S.assess = { next: S.day + 120, last: S.trained, warned: false };
+    if(S.burn100===undefined) S.burn100 = 0;
+    if(S.coachUntil===undefined) S.coachUntil = 0;
     if(!S.globalMult) S.globalMult=1;
     if(!S.restStreak) S.restStreak=0;
     if(!S.startAge) S.startAge = S.age;
@@ -1998,10 +2130,9 @@ function render(){
     (S.sick ? '<button class="act wide actTreat" onclick="doAction(\'treat\')"><div class="t">去看医生</div><div class="d">病好了才能好好训练</div></button>' : '');
 
   renderLog();
+  renderAch();
 
-  $('friendList').innerHTML = S.friends.length
-    ? S.friends.map((f,i)=>'<div class="friendCard"><canvas class="favatar" width="12" height="15" data-fi="'+i+'"></canvas><div class="fi"><div class="fn">'+f.name+'<span class="city">'+f.city+'</span>'+(f.stage?'<span class="stageTag">'+AFF_STAGES[f.stage-1].name+'</span>':'')+'</div><div class="fq">'+f.quirk+'</div><div class="fa">好感度 '+(f.aff||0)+' · 心动好物 <span class="heart">❤️</span>'+((f.fav||[]).map(id=>{const s=SOUVENIRS.find(x=>x.id===id);return s?s.icon:'';}).join(''))+'</div></div><div style="display:flex;flex-direction:column;gap:6px;"><button class="chatBtn" onclick="chatWith('+i+')">聊 天</button><button class="chatBtn" onclick="giftTo('+i+')">送礼物</button></div></div>').join('')
-    : '<div class="hint">还没有朋友。去大城市比赛，会认识别的地区的人。</div>';
+  renderFriends();
   $('friendHint').textContent = S.friends.length ? ('已结识 '+S.metIdx.length+'/'+S.roster.length+' 人 · 好友们让训练效果 +'+(Math.round(Math.min(S.friends.length,10)*(has('sj')?0.3:0.2)*100)/10)+'% · 今天还能聊 '+(chatLimit()-(S.chats||0))+' 次') : '还没有朋友。去大城市比赛，会认识别的地区的人。';
   $('friendHint').title = '好感 50/80/100 会开启关系进阶：老朋友寄明信片 → 知己（聊天上限+1、送礼+4） → 并肩的人（训练加成翻倍）';
   document.querySelectorAll('#friendList .favatar').forEach(el=>drawFriendAvatar(el, S.friends[+el.dataset.fi], +el.dataset.fi));
@@ -2143,6 +2274,23 @@ $('btnStart').onclick = ()=>{
   const stg = ageStage();
   showModal('开 营 日', '「'+name+'」入队了。<br><br>随机生成的性格特征：<br><b>'+d0[0].name+'</b> · '+d0[0].desc+'<br><b>'+d0[1].name+'</b> · '+d0[1].desc+'<br><br>年龄阶段：<b>'+stg.name+'</b> · '+stg.note);
 };
+/* 有进行中的手账时，开新档先确认，防止误覆盖 */
+const _origBtnStart = $('btnStart').onclick;
+$('btnStart').onclick = function(){
+  const raw = localStorage.getItem(SAVE_KEY);
+  if(raw && !window._forceNew){
+    let o = null; try{ o = JSON.parse(raw); }catch(e){}
+    if(o && !o.over){
+      showModal('翻 新 手 账',
+        '有一本进行中的手账：<b>'+o.name+'</b>（第 '+o.day+' 天 · '+Math.ceil(o.day/30)+' 个月）。<br><br>翻开新手账会<b>覆盖</b>它，而且找不回来。',
+        [{label:'继 续 旧 手 账', cb:()=>{ sfx('page'); resumeGame(); }},
+         {label:'仍 要 开 新 的', cb:()=>{ window._forceNew = true; $('btnStart').click(); }}]);
+      return;
+    }
+  }
+  window._forceNew = false;
+  _origBtnStart.call(this);
+};
 $('btnReset').onclick = ()=>{
   if(confirm('确定要重新开始吗？当前手账会被撕掉。')) resetGame();
 };
@@ -2157,15 +2305,102 @@ $('btnSaveNow').onclick = ()=>{
   sfx('chime');
   toast('进度已保存 ✓（'+new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})+'）');
 };
+$('btnHelp').onclick = ()=>{ sfx('tap'); showHelp(); };
+$('btnHome').onclick = ()=>{ sfx('page'); backHome(); };
+$('btnResume').onclick = ()=>{ sfx('page'); resumeGame(); };
+
+/* 回到首页：自动存档，回到开局页（存档保留，可「继续手账」回来） */
+function backHome(){
+  save(); S.lastSave = Date.now(); save();
+  $('setModal').classList.remove('on');
+  $('modal').classList.remove('on');
+  $('screenGame').style.display='none';
+  $('btnSetting').style.display='none';
+  $('screenCreate').style.display='block';
+  $('btnResume').style.display='';
+  toast('已存档 ✓');
+}
+function resumeGame(){
+  if(!load()){ toast('没有找到存档'); return; }
+  $('modal').classList.remove('on');
+  $('setModal').classList.remove('on');
+  $('screenCreate').style.display='none';
+  $('screenGame').style.display='';
+  $('btnSetting').style.display='';
+  laneP = S.swimX || 0; laneTarget = laneP;
+  render();
+  if(S.over) showEndSummary();
+}
+/* 已结束的存档再次打开时，只重演结算页，不再触发新结局 */
+function showEndSummary(){
+  const m = S.medals;
+  const lastEnd = S.log ? S.log.filter(l=>l.t.indexOf('生涯结束') > -1)[0] : null;
+  _mq.push({t:'手 账 之 后',
+    b:(lastEnd ? '<div style="font-size:13px;color:var(--ink-soft);margin-bottom:6px">'+lastEnd.t+'</div>' : '')
+      +'泳池生涯 · '+Math.ceil(S.day/30)+' 个月<br>累计训练量 '+S.trained+'<br>奖牌 🥇'+m.gold+' 🥈'+m.silver+' 🥉'+m.bronze+'<br>朋友 '+S.friends.length+' 人<br>成就 '+ACH.filter(a=>S.ach&&S.ach[a.id]).length+' / '+ACH.length+'<br><br>这本手账已经合上了。',
+    btns:[{label:'重新翻开一本手账', cb:resetGame}]});
+  flushMilestones();
+}
+/* 玩法说明：分类速查 */
+function showHelp(){
+  $('modal').classList.add('above');
+  const H = (t, rows) => '<div style="text-align:left;margin:12px 0 4px;font-weight:700;letter-spacing:.08em;color:var(--accent)">'+t+'</div><div style="text-align:left;font-size:13px;line-height:2">'+rows+'</div>';
+  const L = a => a.map(x=>'· '+x).join('<br>');
+  showModal('玩 法 说 明',
+    H('📖 训练', L([
+      '主课训练吃节奏小游戏：踩点越准，收益越高',
+      '收益 = 勤奋 + 随机，再乘以疲劳、年龄阶段、状态等修正',
+      '技术课涨技巧，力量课涨力量（两项都到 100 封顶）',
+      '连续休息会让状态下滑，别躺太平',
+      '能量胶让下一次主课收益 ×2；好友陪练 30 天内训练 +20%（只有聊天能给）'
+    ])) +
+    H('🏅 比赛', L([
+      '选拔赛通过才能解锁更高级别的比赛',
+      '国内难度：城市邀请赛 < 省锦标赛 < 全国大学生 < 冠军赛 < 国家队选拔',
+      '国际更高一档：亚运会 < 世界杯 < 世锦赛 < 奥运会（最高）',
+      '名次 = 天赋35% + 技巧30% + 力量15% + 勤奋10% + 状态10%，再加划水发挥（命中×2−8）、好友加油 +5、装备加成，随机只占 ±7',
+      '对手 7 人按赛事级别出分，级别越高越难爆冷'
+    ])) +
+    H('🤝 好友', L([
+      '比赛会认识各地的对手，通讯录在这里',
+      '每天聊天次数有限（知己 +1，上限 5 次）',
+      '好感 50 老朋友：寄明信片、回礼、约你陪练（30 天训练 +20%）',
+      '好感 80 知己：点拨技术细节（天赋 +1）、送礼好感 +4、聊天上限 +1',
+      '好感 100 并肩的人：你的每场比赛必到场，发挥 +5',
+      '送礼投其所好（❤️ 标记）好感翻倍；回礼是道具的重要来源'
+    ])) +
+    H('📋 队内考核', L([
+      '每 120 天考核一次，看这个周期的训练量涨幅',
+      '标准随比赛级别和年龄上涨（130 起步）',
+      '第一次不达标：警告，下个周期标准提高两成',
+      '连续两次不达标：被筛出队伍，生涯结束'
+    ])) +
+    H('🩹 身体', L([
+      '疲惫会提高生病概率、压低训练收益和比赛发挥',
+      '疲惫拉满 100：累计 2 次队医警报，4 次直接伤病退役',
+      '生病会掉健康，休息能治好；肌效贴 30 天内不抽筋',
+      '恢复饮料 -25 疲惫，电解质片 +10 健康'
+    ])) +
+    H('🎂 成长与年龄', L([
+      '360 天 = 1 岁，每年生日涨 1 岁',
+      '童子班水感学得快 → 青苗期 → 黄金期 → 成熟期 → 老将（靠经验吃饭）',
+      '40 岁规则会让你上岸——结局「四十岁的浪」'
+    ])) +
+    H('🏁 结局与成就', L([
+      '结局只有 5 个，全部会结束生涯：奥运夺冠 / 转行 / 伤病退役 / 队内淘汰 / 40 岁退役',
+      '成就不结束生涯，共 7 项：32 岁仍在坚持 / 累计 15 金 / 连胜 10 场 / 图鉴全收集 / 5 位好友满好感 / 结识所有人 / 累计 30 场比赛',
+      '成就进度在收藏栏「🏆 成就」页随时可查；合上的手账在首页「回看手账」里'
+    ]))
+  );
+}
 
 /* ================= 启动 ================= */
 if(load()){
   laneP = S.swimX || 0; laneTarget = laneP;
   render();
-  if(S.over){
-    gameOver();
-  }
+  if(S.over){ showEndSummary(); }
 }
+if(localStorage.getItem(SAVE_KEY)){ $('btnResume').style.display=''; }
 </script>
 </body>
 </html>
