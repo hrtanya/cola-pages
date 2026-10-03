@@ -1226,9 +1226,9 @@ function afterAction(kind){
 }
 /* ===== 队内考核：训练量不达标就淘汰 ===== */
 function assessNeed(){
-  const base = 130 + S.trialIdx*70;
-  const agePen = S.age > 23 ? Math.round((S.age-23)*4) : 0;
-  return Math.round((base + agePen) * (S.assess && S.assess.warned ? 1.2 : 1));
+  const base = 100 + S.trialIdx*50;
+  const agePen = S.age > 23 ? Math.round((S.age-23)*3) : 0;
+  return Math.round((base + agePen) * (S.assess && S.assess.warned ? 1.15 : 1));
 }
 function runAssessment(){
   const got = S.trained - (S.assess.last==null ? 0 : S.assess.last);
@@ -2371,7 +2371,7 @@ function showHelp(){
     ])) +
     H('📋 队内考核', L([
       '每 120 天考核一次，看这个周期的训练量涨幅',
-      '标准随比赛级别和年龄上涨（130 起步）',
+      '标准随比赛级别和年龄上涨（100 起步）',
       '第一次不达标：警告，下个周期标准提高两成',
       '连续两次不达标：被筛出队伍，生涯结束'
     ])) +
