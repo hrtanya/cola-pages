@@ -290,7 +290,6 @@
     <div class="titleEn">SWIM LOG</div>
     <div class="wave"></div>
     <div class="field"><label>姓 名</label><input id="inName" maxlength="8" placeholder="给TA取个名字"></div>
-    <div class="field"><label>年 龄</label><input id="inAge" type="number" min="8" max="40" placeholder="8 - 40"></div>
     <div class="field"><label>性 别</label><div class="genderRow"><button class="gBtn on" data-g="f">女</button><button class="gBtn" data-g="m">男</button></div></div>
     <div class="field"><label>发 型</label><div class="pickRow" id="pickHair"></div></div>
     <div class="field"><label>泳 衣</label><div class="pickRow" id="pickSuit"></div></div>
@@ -2105,10 +2104,9 @@ document.querySelectorAll('.tab').forEach(el=>{
 $('btnStart').onclick = ()=>{
   sfx('page');
   const name = $('inName').value.trim();
-  const age = parseInt($('inAge').value, 10);
+  const age = 8; // 默认从 8 岁起步，不再自选
   const gender = document.querySelector('.gBtn.on').dataset.g;
   if(!name){ toast('先给TA取个名字吧'); return; }
-  if(!age || age<8 || age>40){ toast('年龄填 8 - 40 之间'); return; }
   newGame(name, age, gender);
   render();
   const d0 = S.traits.map(t=>TRAITS.find(x=>x.id===t));
