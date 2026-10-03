@@ -48,7 +48,8 @@
 
   /* ---------- 创建页 ---------- */
   #screenCreate{text-align:center;padding-top:9vh;}
-  .titleZh{font-size:34px;letter-spacing:.35em;margin-left:.35em;text-shadow:0 2px 18px rgba(13,74,106,.45);}
+  @font-face{font-family:'TitleHand';src:url('assets/title-hand.woff2') format('woff2');font-display:swap;}
+  .titleZh{font-family:'TitleHand','STXingkai','华文行楷','Xingkai SC','KaiTi','楷体',serif;font-size:56px;letter-spacing:.12em;margin-left:.12em;font-weight:400;text-shadow:0 2px 22px rgba(13,74,106,.55);}
   .titleEn{font-size:13px;color:var(--ink-soft);letter-spacing:.28em;margin-top:8px;}
   .wave{margin:36px auto 40px;width:120px;height:2px;background:rgba(255,255,255,.4);}
   .field{margin:26px 0;}
@@ -325,6 +326,7 @@
       <div class="secTitle">属 性</div>
       <div id="attrBars"></div>
       <div id="sickBadge"></div>
+      <div id="assessNote"></div>
     </div>
 
     <div class="laneRow" id="laneRow"></div>
@@ -1228,7 +1230,20 @@ function afterAction(kind){
 }
 /* ===== 队内考核：训练量不达标就淘汰 ===== */
 function assessNeed(){
-  return 80 + S.trialIdx*30;
+  return 60 + S.trialIdx*30;
+}
+/* 队内考核提示：让玩家随时知道本周期达标线，不用心惊胆战 */
+function renderAssessNote(){
+  if(!S || S.over){ return; }
+  if(!S.assess){ $('assessNote').textContent = ''; return; }
+  const need = assessNeed();
+  const got = S.trained - (S.assess.last==null ? 0 : S.assess.last);
+  const left = Math.max(0, S.assess.next - S.day);
+  const gap = Math.max(0, need - got);
+  const st = S.assess.streak || 0, fa = S.assess.fails || 0;
+  $('assessNote').innerHTML = '📋 队内考核 · 本周期已练 <b>'+got+'</b> / 达标线 '+need
+    + (gap>0 ? '（还差 <b>'+gap+'</b>）' : '（<b>已达标 ✓</b>）')
+    + ' · 剩 '+left+' 天 · 连续未达标 '+st+'/2 · 累计 '+fa+'/5';
 }
 function runAssessment(){
   const got = S.trained - (S.assess.last==null ? 0 : S.assess.last);
@@ -2136,6 +2151,7 @@ function render(){
 
   renderLog();
   renderAch();
+  renderAssessNote();
 
   renderFriends();
   $('friendHint').textContent = S.friends.length ? ('已结识 '+S.metIdx.length+'/'+S.roster.length+' 人 · 好友们让训练效果 +'+(Math.round(Math.min(S.friends.length,10)*(has('sj')?0.3:0.2)*100)/10)+'% · 今天还能聊 '+(chatLimit()-(S.chats||0))+' 次') : '还没有朋友。去大城市比赛，会认识别的地区的人。';
@@ -2376,7 +2392,7 @@ function showHelp(){
     ])) +
     H('📋 队内考核', L([
       '每 120 天考核一次，看这个周期的训练量涨幅',
-      '标准 = 80 + 当前比赛级别×30，只跟级别走',
+      '标准 = 60 + 当前比赛级别×30，只跟级别走',
       '达标会清零连续偷懒计数；累计偷懒不清零',
       '连续 2 个周期、或累计 5 个周期不达标：被筛出队伍，生涯结束',
       '留够时间给技术课和力量课，别把力气全压在主课上'
