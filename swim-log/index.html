@@ -424,8 +424,8 @@ const INT_LOCS = [
   {city:'罗马',country:'意大利'},{city:'巴塞罗那',country:'西班牙'},{city:'喀山',country:'俄罗斯'},{city:'洛杉矶',country:'美国'},
   {city:'蒙特利尔',country:'加拿大'},{city:'里约热内卢',country:'巴西'},{city:'墨尔本',country:'澳大利亚'},{city:'开罗',country:'埃及'}
 ];
-const INT_MEETS = ['世界游泳锦标赛','亚运会','游泳世界杯分站赛','奥运会游泳测试赛'];
-const INT_RIVALS = {'世界游泳锦标赛':[100,114],'亚运会':[92,106],'游泳世界杯分站赛':[96,110],'奥运会游泳测试赛':[98,112],'奥运会':[106,120]};
+const INT_MEETS = ['世界游泳锦标赛','亚运会','洲际游泳锦标赛','奥运会游泳测试赛'];
+const INT_RIVALS = {'世界游泳锦标赛':[100,114],'亚运会':[92,106],'洲际游泳锦标赛':[96,110],'奥运会游泳测试赛':[98,112],'奥运会':[106,120]};
 /* 结局图鉴 */
 /* 结局（全部强制结束生涯）与成就（解锁后生涯继续） */
 const ENDINGS = [
@@ -435,7 +435,7 @@ const ENDINGS = [
    b:'收起泳镜的那天，<b>{name}</b>回头看了一眼空荡的泳池。<br><br>水声停在了身后，路在前面。'},
   {id:'injury', t:'我还不想离开', draw:true, img:'assets/end-injury.png', hint:'疲惫拉满 100 达 4 次，身体先说了再见',
    b:'医生的话很轻，落在耳朵里却很重。<br><br><b>{name}</b>还站在泳池边，手心贴着池边的瓷砖——<br><br>「我还不想离开。」<br><br>水花停了，热爱没有。'},
-  {id:'cut', t:'名单上没有我', draw:true, hint:'连续两次队内考核不达标，被筛出队伍',
+  {id:'cut', t:'名单上没有我', draw:true, hint:'连续 2 个或累计 5 个考核周期不达标，被筛出队伍',
    b:'公告栏的名单换了一茬又一茬，这一次，上面没有<b>{name}</b>。<br><br>收拾柜子的那天，队友们都没怎么说话。<br><br>泳池还在，只是从此换一种方式路过它。'},
   {id:'retire40', t:'四十岁的浪', draw:true, hint:'游到 40 岁，时间到了',
    b:'规则写着：40 岁，该上岸了。<br><br><b>{name}</b>把泳镜挂上池边的钩子，摆正，又摸了一下。<br><br>「下一辈子，还游。」'}
@@ -821,7 +821,7 @@ function friendChance(){
   return clamp(c, 0.1, 0.95);
 }
 
-/* 主课训练：节奏小游戏结算后计效果（踩点越准，倍率越高） */
+/* 主课训练：结算收益（状态越好，倍率越高） */
 function finishMain(mult){
     sfx('splash');
     laneSwim();
@@ -1212,6 +1212,8 @@ function afterAction(kind){
   }
   // 队内考核：每 120 天一个周期，训练量不达标会被筛出队伍
   if(!S.assess) S.assess = { next: S.day + 120, last: S.trained, warned: false };
+    if(S.assess.streak===undefined) S.assess.streak = 0;
+    if(S.assess.fails===undefined) S.assess.fails = 0;
   if(!S.over && S.day >= S.assess.next) runAssessment();
   if(S.over){ save(); render(); return; }
   randomEvent();
@@ -1226,9 +1228,7 @@ function afterAction(kind){
 }
 /* ===== 队内考核：训练量不达标就淘汰 ===== */
 function assessNeed(){
-  const base = 100 + S.trialIdx*50;
-  const agePen = S.age > 23 ? Math.round((S.age-23)*3) : 0;
-  return Math.round((base + agePen) * (S.assess && S.assess.warned ? 1.15 : 1));
+  return 80 + S.trialIdx*30;
 }
 function runAssessment(){
   const got = S.trained - (S.assess.last==null ? 0 : S.assess.last);
@@ -1236,18 +1236,21 @@ function runAssessment(){
   S.assess.next = S.day + 120;
   S.assess.last = S.trained;
   if(got >= need){
-    S.assess.warned = false;
+    S.assess.streak = 0; // 达标清零连续偷懒计数，累计偷懒保留
     addLog('队内考核：本周期训练量 '+got+'（标准 '+need+'），达标。', true);
     toast('📋 队内考核通过 · 训练量 +'+got);
-  } else if(!S.assess.warned){
-    S.assess.warned = true;
-    sfx('sad');
-    addLog('队内考核未达标：训练量 '+got+'/'+need+'。教练给了最后一个周期。', true);
-    showModal('队 内 考 核',
-      '教练把考核表折起来，敲了敲你的柜门：<br><br>「这个周期训练量 <b>'+got+'</b>，标准是 <b>'+need+'</b>。」<br><br>「队里不养闲人。下一个周期再不达标，<b>你就得把柜子腾出来了</b>——而且标准还会提高两成。」<br><br><span style="font-size:12px;color:var(--ink-soft)">120 天后重新考核，累计训练量的涨幅是唯一标准。</span>');
   } else {
-    addLog('连续两次队内考核不达标，你被筛出了队伍。', true);
-    forceEnd('cut');
+    S.assess.streak = (S.assess.streak||0) + 1;
+    S.assess.fails = (S.assess.fails||0) + 1;
+    if(S.assess.streak >= 2 || S.assess.fails >= 5){
+      addLog('队内考核再次不达标（连续 '+S.assess.streak+' 次，累计 '+S.assess.fails+' 次），你被筛出了队伍。', true);
+      forceEnd('cut');
+    } else {
+      sfx('sad');
+      addLog('队内考核未达标：训练量 '+got+'/'+need+'。', true);
+      showModal('队 内 考 核',
+        '教练把考核表折起来，敲了敲你的柜门：<br><br>「这个周期训练量 <b>'+got+'</b>，标准是 <b>'+need+'</b>。」<br><br>「队里不养闲人——<b>连着两个周期不达标，或者累计五个</b>，你就得把柜子腾出来了。」<br><br><span style="font-size:12px;color:var(--ink-soft)">120 天后重新考核 · 连续未达标 '+S.assess.streak+'/2 · 累计未达标 '+S.assess.fails+'/5</span>');
+    }
   }
   save();
 }
@@ -2072,6 +2075,8 @@ function load(){
     if(!S.ach) S.ach = {};
     ACH.forEach(a=>{ if(S.endings && S.endings[a.id]) S.ach[a.id] = true; });
     if(!S.assess) S.assess = { next: S.day + 120, last: S.trained, warned: false };
+    if(S.assess.streak===undefined) S.assess.streak = 0;
+    if(S.assess.fails===undefined) S.assess.fails = 0;
     if(S.burn100===undefined) S.burn100 = 0;
     if(S.coachUntil===undefined) S.coachUntil = 0;
     if(!S.globalMult) S.globalMult=1;
@@ -2348,7 +2353,7 @@ function showHelp(){
   const L = a => a.map(x=>'· '+x).join('<br>');
   showModal('玩 法 说 明',
     H('📖 训练', L([
-      '主课训练吃节奏小游戏：踩点越准，收益越高',
+      '主课训练自动结算：状态、疲劳、年龄阶段都会影响收益',
       '收益 = 勤奋 + 随机，再乘以疲劳、年龄阶段、状态等修正',
       '技术课涨技巧，力量课涨力量（两项都到 100 封顶）',
       '连续休息会让状态下滑，别躺太平',
@@ -2357,7 +2362,7 @@ function showHelp(){
     H('🏅 比赛', L([
       '选拔赛通过才能解锁更高级别的比赛',
       '国内难度：城市邀请赛 < 省锦标赛 < 全国大学生 < 冠军赛 < 国家队选拔',
-      '国际更高一档：亚运会 < 世界杯 < 世锦赛 < 奥运会（最高）',
+      '国际更高一档：亚运会 < 洲际赛 < 世锦赛 < 奥运会（最高）',
       '名次 = 天赋35% + 技巧30% + 力量15% + 勤奋10% + 状态10%，再加划水发挥（命中×2−8）、好友加油 +5、装备加成，随机只占 ±7',
       '对手 7 人按赛事级别出分，级别越高越难爆冷'
     ])) +
@@ -2371,9 +2376,10 @@ function showHelp(){
     ])) +
     H('📋 队内考核', L([
       '每 120 天考核一次，看这个周期的训练量涨幅',
-      '标准随比赛级别和年龄上涨（100 起步）',
-      '第一次不达标：警告，下个周期标准提高两成',
-      '连续两次不达标：被筛出队伍，生涯结束'
+      '标准 = 80 + 当前比赛级别×30，只跟级别走',
+      '达标会清零连续偷懒计数；累计偷懒不清零',
+      '连续 2 个周期、或累计 5 个周期不达标：被筛出队伍，生涯结束',
+      '留够时间给技术课和力量课，别把力气全压在主课上'
     ])) +
     H('🩹 身体', L([
       '疲惫会提高生病概率、压低训练收益和比赛发挥',
@@ -2401,6 +2407,16 @@ if(load()){
   if(S.over){ showEndSummary(); }
 }
 if(localStorage.getItem(SAVE_KEY)){ $('btnResume').style.display=''; }
+/* 开门第一问：新客还是老朋友 */
+function showStartAsk(){
+  showModal('游 泳 馆 开 门 了',
+    '清晨的泳池安安静静，水面还留着昨天的波纹。<br><br>你以前来过吗？',
+    [
+      {label:'第一次玩', cb:()=>{ sfx('page'); showHelp(); }},
+      {label:'在水里留下过痕迹', cb:()=>{ sfx('splash'); }}
+    ]);
+}
+showStartAsk();
 </script>
 </body>
 </html>
