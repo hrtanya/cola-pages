@@ -42,7 +42,8 @@
   .pBtn.on{border-color:var(--accent);color:var(--accent);background:rgba(174,229,242,.08);}
   .swatch{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid rgba(255,255,255,.25);transition:all .15s;padding:0;}
   .swatch.on{border-color:var(--accent);transform:scale(1.18);box-shadow:0 0 0 2px rgba(174,229,242,.35);}
-  .laneRow{margin:14px 0 12px;}
+  .laneRow{margin:14px 0 12px;position:relative;}
+  #laneTxt{position:absolute;right:6%;top:50%;transform:translateY(-50%);font-size:13px;letter-spacing:.14em;color:rgba(242,251,253,.75);pointer-events:none;white-space:nowrap;}
   #laneCv{display:block;width:100%;height:72px;image-rendering:pixelated;}
   .wrap{max-width:680px;margin:0 auto;padding:48px 24px 96px;position:relative;z-index:1;}
 
@@ -935,7 +936,7 @@ function finishMain(mult){
     gain = Math.min(gain, cap);
     S.trained += gain;
     S.fatigue = clamp(S.fatigue + Math.round(16 - S.diligence*0.05 + R(6)), 0, 100);
-    S.tech += 0.3;
+    S.tech = Math.min(100, S.tech + 0.3);
     addLog('主课训练'+(S.sick?'（带病上场）':'')+(cramp?'，中途小腿抽筋，量打了折':'')+gelNote+(dip<1?'（歇太久了，状态有点下滑）':'')+'，训练量 +'+gain+'。'+(capped?'（天赋所限，今天再练也吞不下更多了）':'')+fatigueNote());
 }
 
@@ -2043,9 +2044,14 @@ let laneP = 0, laneTarget = 0;   // 0~1 泳道位置（运行时）
 let laneMode = {type:'water', until:0};
 const SCALE = 2;
 function px(x,y,w,h,c){ cx.fillStyle=c; cx.fillRect(Math.round(x)*SCALE, Math.round(y)*SCALE, w*SCALE, h*SCALE); }
+const laneTxt = document.createElement('div');
+laneTxt.id = 'laneTxt';
 function attachLane(){
   const row = document.getElementById('laneRow');
-  if(row && cv.parentElement !== row){ row.innerHTML=''; row.appendChild(cv); }
+  if(row && cv.parentElement !== row){ row.innerHTML=''; row.appendChild(cv); row.appendChild(laneTxt); }
+}
+function setLaneTxt(t){
+  if(laneTxt.textContent !== t) laneTxt.textContent = t;
 }
 function skinC(){ return (S && S.skinColor) || '#ffd9b3'; }
 function suitC(){ return (S && S.suitColor) || (S && S.gender==='m' ? '#5aa8cc' : '#e8798a'); }
@@ -2117,9 +2123,7 @@ function drawLane(ts){
     const pose = Math.floor(ts/300) % 3;
     if(inGym) drawStand(pose, 110, 27, true);
     else drawStand(pose, 110, 27, false);
-    cx.fillStyle='rgba(242,251,253,.55)';
-    cx.font='12px sans-serif';
-    cx.fillText(inGym ? '陆上力量 · 撸铁中' : '陆上技术 · 动作练习', 300, 26);
+    setLaneTxt(inGym ? '陆上力量 · 撸铁中' : '陆上技术 · 动作练习');
     return;
   }
   // 水面泳道
@@ -2141,6 +2145,7 @@ function drawLane(ts){
   const bx = (sx - 40 - (ts/40)%60 + 480) % 480;
   cx.fillStyle='rgba(255,255,255,.25)';
   cx.fillRect(bx, 52, 3, 3); cx.fillRect(bx+14, 58, 2, 2);
+  setLaneTxt('');
 }
 function laneLoop(ts){
   if(cv.isConnected) drawLane(ts);
@@ -2183,8 +2188,7 @@ function drawSleep(ts){
   cx.fillStyle='rgba(242,251,253,.85)';
   cx.font='11px sans-serif'; cx.fillText('z', 168, 30 - zoff*5);
   cx.font='14px sans-serif'; cx.fillText('Z', 180, 24 - zoff*5);
-  cx.fillStyle='rgba(242,251,253,.5)';
-  cx.font='12px sans-serif'; cx.fillText('休息中 · 恢复体力', 290, 26);
+  setLaneTxt('休息中 · 恢复体力');
 }
 
 /* ================= 好友聊天（微信风） / 送礼 ================= */
@@ -2480,6 +2484,9 @@ function load(){
     if(S.burn100===undefined) S.burn100 = 0;
     if(S.coachUntil===undefined) S.coachUntil = 0;
     if(S.meet7===undefined) S.meet7 = null;
+    // 力量/技巧硬上限 100：把历史存档里溢出的部分压回去
+    S.tech = Math.min(100, Math.max(0, S.tech));
+    S.strength = Math.min(100, Math.max(0, S.strength));
     if(!S.globalMult) S.globalMult=1;
     if(!S.restStreak) S.restStreak=0;
     if(!S.startAge) S.startAge = S.age;
