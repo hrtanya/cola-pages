@@ -2363,19 +2363,20 @@ function tapItem(key){
   if(info.place){ viewPhoto(info.place, info.name+' ×'+S.items[key]); }
   else showModal(info.name, '<div class="pcBig">'+info.icon+'</div><div class="pcCap">×'+S.items[key]+' · '+info.desc+'</div>');
 }
-function viewPhoto(place, title){
-  const ph = photoOf(place);
-  if(!ph || (!ph.pix && !ph.url)){ showModal(title, '<div class="pcBig">🏙️</div><div class="pcCap">'+(ph?ph.name:place)+'的风景，等你亲自去看</div>'); return; }
+function pcImgHtml(ph, place){
+  if(!ph || (!ph.pix && !ph.url)) return '<div class="pcBig">🏙️</div><div class="pcCap">'+(ph?ph.name:place)+'的风景，等你亲自去看</div>';
   if(ph.pix){
     const fb = ph.url ? imgUrl(ph.url) : '';
-    showModal(title, '<img class="pcImg pixImg" src="'+ph.pix+'" data-fallback="'+fb+'" onerror="pixFail(this)"><div class="pcCap">'+ph.name+'</div>');
-    return;
+    return '<img class="pcImg pixImg" src="'+ph.pix+'" data-fallback="'+fb+'" onerror="pixFail(this)"><div class="pcCap">'+ph.name+'</div>';
   }
   const m = ph.url.match(/\/thumb\/(.+)\/(\d+)px-/);
   const path = m ? m[1] : '';
   const cur = m ? m[2]+'px' : '';
   const alts = ['500px','960px','330px','1280px'].filter(w=>w!==cur).join(',');
-  showModal(title, '<img class="pcImg" src="'+imgUrl(ph.url)+'" data-path="'+path+'" data-alts="'+alts+'" onerror="pcImgFail(this)"><div class="pcCap">'+ph.name+'</div>');
+  return '<img class="pcImg" src="'+imgUrl(ph.url)+'" data-path="'+path+'" data-alts="'+alts+'" onerror="pcImgFail(this)"><div class="pcCap">'+ph.name+'</div>';
+}
+function viewPhoto(place, title){
+  showModal(title, pcImgHtml(photoOf(place), place));
 }
 function pixFail(el){
   const fb = el.dataset.fallback;
@@ -2959,12 +2960,25 @@ function roomClick(e){
   const y = (e.clientY - r.top) * (cv.height/r.height);
   const hit = (sl)=> x>=sl.x-4 && x<=sl.x+74 && y>=sl.y-4 && y<=sl.y+56;
   for(const i in S.wall.card){
-    if(hit(ROOM_CARD_SLOTS[i])){ delete S.wall.card[i]; sfx('page'); save(); render(); return; }
+    if(hit(ROOM_CARD_SLOTS[i])){ openWallCard(S.wall.card[i]); return; }
   }
   for(const i in S.wall.shelf){
     const sl = ROOM_SHELF_SLOTS[i];
-    if(x>=sl.x-4 && x<=sl.x+44 && y>=sl.y-4 && y<=sl.y+48){ delete S.wall.shelf[i]; sfx('page'); save(); render(); return; }
+    if(x>=sl.x-4 && x<=sl.x+44 && y>=sl.y-4 && y<=sl.y+48){ tapItem(S.wall.shelf[i]); return; }
   }
+}
+/* 点墙上钉着的明信片：看大图，想取下在弹窗里一键取 */
+function openWallCard(key){
+  const place = key.split('@')[1];
+  const ph = photoOf(place);
+  showModal(place+'明信片', pcImgHtml(ph, place), [
+    {label:'从墙上取下来', cb:()=>{
+      for(const i in S.wall.card){
+        if(S.wall.card[i]===key){ delete S.wall.card[i]; sfx('page'); save(); render(); toast('已取下 · '+place+'明信片'); return; }
+      }
+    }},
+    {label:'留在墙上', cb:()=>{}}
+  ]);
 }
 function renderRoom(){
   const box = $('roomBtns'); if(!box) return;
@@ -2979,7 +2993,7 @@ function renderRoom(){
   cards.forEach(k=>{ html += hangBtn(k, 'card', usedCard>=6 && Object.values(S.wall.card).indexOf(k)<0); });
   shelfs.forEach(k=>{ html += hangBtn(k, 'shelf', usedShelf>=6 && Object.values(S.wall.shelf).indexOf(k)<0); });
   box.innerHTML = html || '<div class="hint">比赛和训练会带来明信片和纪念品——拿到手就能钉上这面墙。</div>';
-  $('roomHint').textContent = '墙上能钉 6 张明信片、摆 6 件纪念品；点墙上的东西可以取下来。奖牌会自己挂上奖牌轨。';
+  $('roomHint').textContent = '墙上能钉 6 张明信片、摆 6 件纪念品；点墙上的明信片可以看大图（里面能取下来），取下纪念品用下面的「取下」按钮。奖牌会自己挂上奖牌轨。';
 }
 function roomToggle(kind, key){
   const wall = S.wall[kind];
