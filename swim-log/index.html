@@ -266,6 +266,12 @@
   #plStats{display:flex;gap:18px;justify-content:center;font-size:13px;color:#ffe9b8;margin:2px 0 0;}
   #plMsg{font-size:13px;color:#fff;min-height:44px;margin:4px 0 10px;line-height:1.7;}
   #plBtns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+  #plMapWrap{position:relative;}
+  .plLab{position:absolute;transform:translateX(-50%);font-size:13px;font-weight:600;letter-spacing:.18em;color:#fff;text-shadow:0 1px 3px rgba(20,20,40,.6);pointer-events:none;transition:transform .15s ease;}
+  #labPool{left:20.6%;top:21%;}
+  #labHotel{left:79.4%;top:7%;}
+  #labPark{left:51.3%;top:86%;}
+  #plMapHint{position:absolute;left:0;right:0;top:50%;text-align:center;font-size:12px;color:rgba(43,43,58,.85);pointer-events:none;}
   .sgCard{background:rgba(8,44,62,.9);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.18);border-radius:18px;padding:34px 30px;width:86%;max-width:380px;text-align:center;box-shadow:0 18px 50px rgba(4,32,46,.4);}
   .sgTitle{font-size:14px;letter-spacing:.25em;color:var(--accent);margin-bottom:8px;}
   .sgSub{font-size:12px;color:var(--ink-soft);margin-bottom:20px;min-height:18px;}
@@ -412,7 +418,7 @@
 </div></div>
 <div id="modal"><div class="modalCard"><div class="mt" id="mdTitle"></div><div class="mb" id="mdBody"></div><div id="mdBtns"></div></div></div>
 <div id="swimGame"><div class="sgCard"><div class="sgTitle" id="sgTitle">决 赛 · 划 水 节 奏</div><div class="sgFan" id="sgFan"><canvas id="fanCv" width="60" height="14"></canvas><span id="sgFanName"></span></div><div class="sgSub" id="sgSub">在白线滑进绿色区域时按「划水」</div><div class="sgBar"><div class="sgZone" id="sgZone"></div><div class="sgCore"></div><div class="sgNeedle" id="sgNeedle"></div></div><button class="btn sgTap" id="sgTap" onclick="sgTap()">划 水 ！</button><div class="sgDots" id="sgDots"></div></div></div>
-<div id="plane"><div class="plCard"><div class="sgTitle" id="plTitle">大 赛 · 第 1 天 / 7</div><div id="plStats"></div><canvas id="plMap" width="320" height="200" onclick="planeClick(event)" onmousemove="planeHover(event)" onmouseleave="planeHoverOut()"></canvas><div id="plMsg"></div><div id="plBtns"></div></div></div>
+<div id="plane"><div class="plCard"><div class="sgTitle" id="plTitle">大 赛 · 第 1 天 / 7</div><div id="plStats"></div><div id="plMapWrap"><canvas id="plMap" width="320" height="200" onclick="planeClick(event)" onmousemove="planeHover(event)" onmouseleave="planeHoverOut()"></canvas><div class="plLab" id="labPool">游 泳 馆</div><div class="plLab" id="labHotel">酒 店</div><div class="plLab" id="labPark">景 点</div><div id="plMapHint"></div></div><div id="plMsg"></div><div id="plBtns"></div></div></div>
 <div id="envWrap"><div class="envStage"><div class="envLetter" id="envLetter"></div><canvas id="envCv" width="64" height="48" onclick="envOpen()"></canvas><div class="envHint" id="envHint">点一下，拆开</div></div></div>
 <div class="toast" id="toast"></div>
 
@@ -1956,11 +1962,19 @@ function drawPlaneMap(){
   g.fillStyle='#2b2b3a'; g.fillRect(p[0]-3, p[1], 6, 8);
   g.fillStyle=skinC(); g.fillRect(p[0]-3, p[1]-6, 6, 6);
   g.fillStyle='#7ee7cd'; g.fillRect(p[0]-3, p[1]-8, 6, 2);
-  g.font='10px sans-serif'; g.textAlign='center';
-  g.fillStyle='#ffffff'; g.fillText('游 泳 馆', 66, 46); g.fillText('酒 店', 254, 20); g.fillText('景 点', 164, 200);
-  g.fillStyle='rgba(43,43,58,.8)';
-  g.fillText(m && m.day >= 5 ? '决赛日 · 看台见' : '点一栋建筑，度过今天', 160, 110);
-  g.textAlign='start';
+  planeLabs();
+}
+function planeLabs(){
+  const m = S.meet7;
+  const lift = k => (m && m.on && m.day < 5 && PL_HOVER===k) ? -4 : 0;
+  const lab = [['labPool','pool'],['labHotel','hotel'],['labPark','park']];
+  for(let i=0;i<lab.length;i++){
+    const el = $(lab[i][0]);
+    el.style.transform = 'translateX(-50%) translateY('+lift(lab[i][1])+'px)';
+    el.style.opacity = (m && m.day < 5) ? '1' : '.75';
+  }
+  const hint = $('plMapHint');
+  hint.textContent = (m && m.day >= 5) ? '决赛日 · 看台见' : '点一栋建筑，度过今天';
 }
 
 /* ================= 国际赛事 ================= */
