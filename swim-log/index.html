@@ -309,6 +309,7 @@
     <button class="btn" id="btnStart">翻 开 手 账</button>
     <button class="gBtn" id="btnHistory">回 看 手 账</button>
     <button class="gBtn" id="btnResume" style="display:none">继 续 手 账</button>
+    <button class="gBtn" id="btnAchHome" style="display:none">我 的 成 就</button>
     <div class="hint">性格特征会在开局时随机生成，影响TA的整个运动生涯</div>
     <div class="credit">© 花染 · 本作品由本人使用 AI 独立设计并制作</div>
   </section>
@@ -326,6 +327,7 @@
       <div class="secTitle">属 性</div>
       <div id="attrBars"></div>
       <div id="sickBadge"></div>
+      <div id="strokeNote"></div>
       <div id="assessNote"></div>
     </div>
 
@@ -341,7 +343,7 @@
       <div class="tab" data-tab="friends">好友</div>
       <div class="tab" data-tab="items">收藏</div>
       <div class="tab" data-tab="gear">道具</div>
-      <div class="tab" data-tab="dex">图鉴</div>
+      <div class="tab" data-tab="dex">房间</div>
       <div class="tab" data-tab="medals">战绩</div>
       <div class="tab" data-tab="ach">成就</div>
     </div>
@@ -361,8 +363,9 @@
     </div>
     <div class="panel" id="panel-ach"><div id="achList"></div></div>
     <div class="panel" id="panel-dex">
-      <div id="dexList"></div>
-      <div class="hint">图鉴按足迹点亮：拿到哪座城市、哪个国家的纪念品，就点亮哪里。</div>
+      <canvas id="roomWall" width="480" height="300" style="width:100%;max-width:480px;border-radius:10px;display:block;margin:0 auto;cursor:pointer;" onclick="roomClick(event)"></canvas>
+      <div id="roomBtns" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px;"></div>
+      <div class="hint" id="roomHint"></div>
     </div>
     <div class="panel" id="panel-medals">
       <div class="medalRow">
@@ -479,6 +482,62 @@ const MEET_TIERS = [
   {name:'全国冠军赛', rivals:[84,97]},
   {name:'国家队选拔赛', rivals:[94,108]}
 ];
+/* ===== 泳姿专项：一年后教练定主项，主项决定比赛属性权重 ===== */
+const STROKES = [
+  {id:'free',   name:'自由泳', desc:'天赋主导，水到渠成', w:{talent:.40, tech:.25, strength:.20, dil:.15}},
+  {id:'breast', name:'蛙泳',   desc:'节奏为王，技巧吃重', w:{talent:.25, tech:.40, strength:.15, dil:.20}},
+  {id:'fly',    name:'蝶泳',   desc:'力量就是正义',       w:{talent:.20, tech:.15, strength:.45, dil:.20}},
+  {id:'back',   name:'仰泳',   desc:'水感细腻，勤奋复利', w:{talent:.25, tech:.30, strength:.10, dil:.35}}
+];
+const BASE_W = {talent:.35, tech:.30, strength:.15, dil:.10};
+function strokeW(){
+  if(!S.stroke) return BASE_W;
+  const st = STROKES.find(x=>x.id===S.stroke);
+  return st ? st.w : BASE_W;
+}
+function strokeName(){
+  if(!S.stroke) return '';
+  const st = STROKES.find(x=>x.id===S.stroke);
+  return st ? st.name : '';
+}
+function pickStroke(){
+  const rank = [
+    ['free',   S.talent], ['breast', S.tech],
+    ['fly',    S.strength], ['back', S.diligence]
+  ].sort((a,b)=>b[1]-a[1]);
+  let st = STROKES.find(x=>x.id===rank[0][0]);
+  if(S.strokeRefusedId && st.id === S.strokeRefusedId){
+    st = STROKES.find(x=>x.id===rank[1][0] && x.id!==S.strokeRefusedId) || STROKES.find(x=>x.id!==S.strokeRefusedId) || st;
+  }
+  return st;
+}
+function acceptStroke(st){
+  S.stroke = st.id;
+  sfx('chime');
+  addLog('主项定了：'+st.name+'。'+st.desc+'。', true);
+  save();
+  toast('🏊 主项确定 · '+st.name);
+}
+function offerStroke(){
+  const st = pickStroke();
+  const forced = !!S.strokeRefusedId;
+  const wtxt = '天赋 '+Math.round(st.w.talent*100)+'% · 技巧 '+Math.round(st.w.tech*100)+'% · 力量 '+Math.round(st.w.strength*100)+'% · 勤奋 '+Math.round(st.w.dil*100)+'%';
+  const btns = [];
+  if(!forced){
+    btns.push({label:'接 受 · '+st.name, cb:()=>{ acceptStroke(st); }});
+    btns.push({label:'不接受，再练一年', cb:()=>{
+      S.strokeRefusedId = st.id;
+      addLog('教练提议主攻'+st.name+'，你想再全面练练。教练说：明年这个时候，必须定下来。', true);
+      save();
+    }});
+  } else {
+    btns.push({label:'接受教练的安排 · '+st.name, cb:()=>{ acceptStroke(st); }});
+  }
+  queueModal(forced ? '主 项 定 了' : '教 练 找 你 谈 话',
+    '教练翻着你这一年的训练日记，在纸上圈了一个词：<b>'+st.name+'</b>。<br><br>「你这块料，适合游这个。'+st.desc+'。」<br><br><span style="font-size:12px;color:var(--ink-soft)">主项改变比赛属性权重：'+wtxt+'</span>'
+    + (forced ? '<br><br><span style="font-size:12px;color:var(--ink-soft)">去年你说再等等——今年，没得再等了。</span>' : '<br><br><span style="font-size:12px;color:var(--ink-soft)">不接受的话，明年教练会重新推荐一个，那时必须二选一。</span>'),
+    btns);
+}
 const TRIALS = [60, 180, 400, 700];
 const CHAT_TOPICS = [
   {open:'说起{city}的家常菜，两眼放光，问你会不会做饭',
@@ -523,7 +582,8 @@ const SOUVENIRS = [
   {id:'pin',   icon:'🏅', name:'参赛纪念章', desc:'别在泳包上正好'},
   {id:'goggle',icon:'🕶️', name:'泳镜挂坠',   desc:'迷你泳镜，做工意外地精緻'},
   {id:'clip',  icon:'🐟', name:'鲨鱼发夹',   desc:'咬住头发的力度刚刚好'},
-  {id:'cap',   icon:'🧢', name:'签名泳帽',   desc:'上面有个歪歪扭扭的签名'}
+  {id:'cap',   icon:'🧢', name:'签名泳帽',   desc:'上面有个歪歪扭扭的签名'},
+  {id:'relay', icon:'🥇', name:'接力赛纪念棒', desc:'四个人的浪，一次'},
 ];
 const GIFT_THANKS = ['这也太懂我了吧！','你怎么知道我缺这个！','收下了，比赛给你带好运','我要摆在书桌上天天看','下次我也带东西送你'];
 const SAVE_KEY = 'swimlog_save_v3';
@@ -728,6 +788,7 @@ function newGame(name, age, gender){
     dex:{cn:{}, intl:{}}, rewards:{}, buffDay:0, globalMult:1, restStreak:0, startAge: clamp(age,8,40),
     gear:{}, suitBuff:false, gelBuff:false, tapeUntil:0, sponsorAsked:false, meetDistract:false,
     roster: buildRoster(), metIdx:[], endings:{},
+    stroke:null, strokeRefusedId:null, wall:{card:{}, shelf:{}}, relayDay:null,
     hairstyle:_look.hair, suitColor:_look.suit, skinColor:_look.skin
   };
   traits.forEach(t=>{
@@ -796,7 +857,24 @@ function checkAffStage(f){
 }
 let _mq = [];
 function flushMilestones(){
-  if(_mq.length){ const m=_mq.shift(); showModal(m.t, m.b, m.btns); }
+  if(_mq.length){ const m=_mq.shift(); if(m.fn){ m.fn(); } else showModal(m.t, m.b, m.btns); }
+}
+/* 弹窗排队：窗口已被占用（或队列非空）时改为入队，避免互相覆盖 */
+function queueModal(t, b, btns){
+  if($('modal').classList.contains('on') || _mq.length){ _mq.push({t:t, b:b, btns:btns}); }
+  else showModal(t, b, btns);
+}
+/* 信封（比赛邀请）不插队：等弹窗队列清空再打开 */
+let _pendingEnvelope = null;
+function fireEnvelope(t, b, ok, no){
+  const fn = ()=>openEnvelope(t, b, ok, no);
+  if($('modal').classList.contains('on') || _mq.length){ _pendingEnvelope = fn; }
+  else fn();
+}
+function drainEnvelope(){
+  if(!_mq.length && !document.getElementById('modal').classList.contains('on') && _pendingEnvelope){
+    const fn = _pendingEnvelope; _pendingEnvelope = null; fn();
+  }
 }
 function chatLimit(){
   let n = 3;
@@ -1218,6 +1296,15 @@ function afterAction(kind){
     if(S.assess.fails===undefined) S.assess.fails = 0;
   if(!S.over && S.day >= S.assess.next) runAssessment();
   if(S.over){ save(); render(); return; }
+  // 练满一年：教练定主项
+  if(!S.over && !S.stroke && S.day >= (S.strokeRefusedId ? 720 : 360)) offerStroke();
+  // 有 3 个好友后，偶尔组 4x100 接力
+  if(!S.over && !S.relayDay && S.trialIdx>=1 && S.friends.length>=3 && Math.random()<0.02){
+    S.relayDay = S.day + 20 + R(20);
+    addLog('教练在走廊叫住你：队里要组 4x100 接力，让你挑三个伙伴。');
+  }
+  if(!S.over && S.relayDay && S.day >= S.relayDay){ S.relayDay = null; offerRelay(); }
+  if(S.over){ save(); render(); return; }
   randomEvent();
   scheduleTrial();
   offerTrial();
@@ -1233,6 +1320,12 @@ function assessNeed(){
   return 60 + S.trialIdx*30;
 }
 /* 队内考核提示：让玩家随时知道本周期达标线，不用心惊胆战 */
+function renderStrokeNote(){
+  if(!S){ return; }
+  $('strokeNote').innerHTML = S.stroke
+    ? '🏊 主项 · <b>'+strokeName()+'</b> —— '+STROKES.find(x=>x.id===S.stroke).desc
+    : '<span style="opacity:.75">🏊 主项未定 —— 练满一年，教练会来找你谈话</span>';
+}
 function renderAssessNote(){
   if(!S || S.over){ return; }
   if(!S.assess){ $('assessNote').textContent = ''; return; }
@@ -1263,7 +1356,7 @@ function runAssessment(){
     } else {
       sfx('sad');
       addLog('队内考核未达标：训练量 '+got+'/'+need+'。', true);
-      showModal('队 内 考 核',
+      queueModal('队 内 考 核',
         '教练把考核表折起来，敲了敲你的柜门：<br><br>「这个周期训练量 <b>'+got+'</b>，标准是 <b>'+need+'</b>。」<br><br>「队里不养闲人——<b>连着两个周期不达标，或者累计五个</b>，你就得把柜子腾出来了。」<br><br><span style="font-size:12px;color:var(--ink-soft)">200 天后重新考核 · 连续未达标 '+S.assess.streak+'/2 · 累计未达标 '+S.assess.fails+'/5</span>');
     }
   }
@@ -1329,7 +1422,7 @@ const SPECIAL_EVENTS = [
 ];
 function offerSpecialEvent(){
   const ev = pick(SPECIAL_EVENTS);
-  showModal(ev.t, ev.b, ev.opts.map(o=>({label:o.label, cb:()=>{
+  queueModal(ev.t, ev.b, ev.opts.map(o=>({label:o.label, cb:()=>{
     const mark = S.log.length;
     o.cb(); save();
     const fresh = S.log.slice(0, Math.max(1, S.log.length-mark)).map(l=>l.t).join('<br><br>');
@@ -1340,7 +1433,7 @@ function offerSpecialEvent(){
 function offerSupplement(){
   const who = pick(['教练','同屋的队友','别的运动员','队医']);
   const what = pick(SUPPLEMENTS);
-  showModal('运 动 补 剂',
+  queueModal('运 动 补 剂',
     who+'塞给你一罐<b>'+what+'</b>：「练这么狠，补补。」<br><br>罐子上没个正经标签……吃吗？',
     [
       {label:'吃', cb:supResult},
@@ -1384,7 +1477,7 @@ function offerTrial(){
   if(S.trialDay !== null && S.day >= S.trialDay){
     const tier = MEET_TIERS[S.trialIdx];
     const p = trialChance();
-    showModal('选 拔 赛',
+    queueModal('选 拔 赛',
       '今天队里临时宣布有一场选拔赛，通过的可以去打<b>「'+tier.name+'」</b>。<br><br>你的状态：疲惫 '+S.fatigue+(S.sick?' · 还在生病':'')+'<br>胜算大约 <b>'+Math.round(p*100)+'%</b>。<br><br>参不参加？',
       [
         {label:'跳下去', cb:runTrial},
@@ -1401,13 +1494,13 @@ function runTrial(){
   const tier = MEET_TIERS[S.trialIdx];
   if(Math.random() < trialChance()){
     S.trialIdx++;
-    showModal('选 拔 赛', S.name+'深吸一口气，跳了下去。<br><br>通过了<b>「'+tier.name+'」</b>的选拔！');
+    queueModal('选 拔 赛', S.name+'深吸一口气，跳了下去。<br><br>通过了<b>「'+tier.name+'」</b>的选拔！');
     addLog('选拔赛通过！获得'+tier.name+'参赛资格。', true);
     scheduleMeet();
   }else{
     const wait = (2+R(3))*TICK;
     S.trialDay = S.day + wait;
-    showModal('选 拔 赛', S.name+'这一趟游得急了。<br><br>选拔没有通过，教练说：'+wait+'天后还有一次机会。');
+    queueModal('选 拔 赛', S.name+'这一趟游得急了。<br><br>选拔没有通过，教练说：'+wait+'天后还有一次机会。');
     addLog('选拔赛未通过，'+wait+'天后可以再试。');
   }
   save();
@@ -1425,7 +1518,7 @@ function offerMeet(){
   if(S.meetDay !== null && S.day >= S.meetDay){
     const tier = MEET_TIERS[Math.min(S.trialIdx,MEET_TIERS.length)-1];
     const city = pick(CITIES);
-    openEnvelope('比 赛 邀 请',
+    fireEnvelope('比 赛 邀 请',
       '<b>'+tier.name+'</b>（'+city+'）今天开赛。<br><br>你的状态：疲惫 '+S.fatigue+(S.sick?' · 还在生病':'')+'<br><br>去吗？赛场上说不定能认识别处的人。',
       ()=>{ if(Math.random() < 0.4){ offerSponsor(tier, city); } else { runMeet(tier, city); } },
       ()=>{ S.meetDistract=false; addLog('推掉了'+city+'的比赛，继续闷头训练。'); S.meetDay = S.day + 30+R(30); });
@@ -1460,7 +1553,8 @@ function fanLine(fan, rank){
 }
 function runMeetResult(tier, city, hits, fan){
   const bonus = hits*2 - 8;
-  const mine = S.talent*0.35 + S.tech*0.30 + S.strength*0.15 + S.diligence*0.10 + (100-S.fatigue)*0.10 + R(14)-7 + bonus
+  const w = strokeW();
+  const mine = S.talent*w.talent + S.tech*w.tech + S.strength*w.strength + S.diligence*w.dil + (100-S.fatigue)*0.10 + R(14)-7 + bonus
     + (S.suitBuff?12:0) + (fan?5:0) - (S.meetDistract?10:0);
   if(S.suitBuff){ S.suitBuff=false; addLog('竞速泳衣贴身如肤，划水都利落了几分。', true); }
   S.meetDistract = false; S.sponsorAsked = false;
@@ -1476,7 +1570,7 @@ function runMeetResult(tier, city, hits, fan){
   else if(rank===2){ S.medals.silver++; medalTxt='🥈 银牌'; }
   else if(rank===3){ S.medals.bronze++; medalTxt='🥉 铜牌'; }
   S.meets.push({day:S.day, city, name:tier.name, rank});
-  addLog(tier.name+'（'+city+'）：'+rankTxt+(medalTxt?'，'+medalTxt:'')+'。', true);
+  addLog(tier.name+' · 100米'+(strokeName()||'混合')+'（'+city+'）：'+rankTxt+(medalTxt?'，'+medalTxt:'')+'。', true);
   // 比赛纪念品：明信片带城市邮戳，其余通用品
   if(Math.random() < 0.30) gainItem('card', city);
   else if(Math.random() < 0.22) gainItem(pick(GENERICS));
@@ -1487,7 +1581,7 @@ function runMeetResult(tier, city, hits, fan){
   const meetChances = S.trialIdx>=3 ? [0.65,0.5,0.4] : (S.trialIdx>=2 ? [0.65,0.45] : [0.65]);
   meetChances.forEach(ch=>{ if(Math.random() < ch){ const e = makeFriend(city); if(e) extra += e; } });
   const bonusTxt = '<span style="font-size:12px;color:var(--ink-soft)">（划水节奏 '+hits+'/8，发挥'+(bonus>=0?'+':'')+bonus+'）</span>';
-  showModal(tier.name, city+'的泳池，八条泳道。<br><br>'+bonusTxt+'<br><br>'+S.name+'拿到了<b>'+rankTxt+'</b>'+(medalTxt?'，'+medalTxt:'')+'。'+fanLine(fan, rank)+extra);
+  showModal(tier.name+' · 100米'+(strokeName()||'混合'), city+'的泳池，八条泳道。<br><br>'+bonusTxt+'<br><br>'+S.name+'拿到了<b>'+rankTxt+'</b>'+(medalTxt?'，'+medalTxt:'')+'。'+fanLine(fan, rank)+extra);
   checkEndings();
   scheduleTrialIfNeeded();
   if(S.trialIdx >= 1){
@@ -1536,7 +1630,7 @@ function offerRetire(){
   if(S.day < 25 || S.over) return;
   const chance = S.talent < 55 ? 0.035 : 0.008;
   if(Math.random() >= chance) return;
-  showModal('另一个世界',
+  queueModal('另一个世界',
     '有人看了你的比赛，递来一张名片：<b>「游泳很苦，要不要考虑一条更轻松的路？」</b><br><br>天赋有限，练到今天，进步也越来越慢了。要不要转行？',
     [
       {label:'再坚持一下', cb:()=>{ addLog('你想了想，还是放不下泳池。这条路再走一段。', true); }},
@@ -1603,7 +1697,7 @@ function offerInternational(){
   let isOlympic = false;
   if(Math.random() < 0.15){ meet = '奥运会'; rivals = INT_RIVALS['奥运会']; isOlympic = true; }
   S.intCount++;
-  openEnvelope(meet==='奥运会' ? '奥 运 会 邀 请' : '国 际 邀 请',
+  fireEnvelope(meet==='奥运会' ? '奥 运 会 邀 请' : '国 际 邀 请',
     '一封从<b>'+loc.city+'</b>（'+loc.country+'）寄来的邀请函：<b>'+meet+'</b>'+(isOlympic?'。<br><br><b>这是奥运会。</b>全世界的目光都在这里。':'。<br><br>全世界的快泳手都会去。你的名字，也在名单上。')+'<br><br>去吗？',
     ()=>runIntMeet(meet, loc.city, loc.country, rivals),
     ()=>{ S.intCount = 0; addLog('婉拒了'+loc.city+'的邀请，先把国内的路走稳。'); });
@@ -1617,7 +1711,8 @@ function runIntMeet(meet, city, country, rivals){
 function runIntMeetResult(meet, city, country, rivals, hits, fan){
   rivals = rivals || INT_RIVALS[meet] || [100,114];
   const bonus = hits*2 - 8;
-  const mine = S.talent*0.35 + S.tech*0.30 + S.strength*0.15 + S.diligence*0.10 + (100-S.fatigue)*0.10 + R(14)-7 + bonus
+  const w = strokeW();
+  const mine = S.talent*w.talent + S.tech*w.tech + S.strength*w.strength + S.diligence*w.dil + (100-S.fatigue)*0.10 + R(14)-7 + bonus
     + (S.suitBuff?12:0) + (fan?5:0) - (S.meetDistract?10:0);
   if(S.suitBuff){ S.suitBuff=false; addLog('竞速泳衣贴身如肤，划水都利落了几分。', true); }
   S.meetDistract = false;
@@ -1633,7 +1728,7 @@ function runIntMeetResult(meet, city, country, rivals, hits, fan){
   else if(rank===2){ S.medals.silver++; medalTxt='🥈 银牌'; }
   else if(rank===3){ S.medals.bronze++; medalTxt='🥉 铜牌'; }
   S.meets.push({day:S.day, city, name:meet+' · 国际', rank});
-  addLog(meet+'（'+city+'）：'+rankTxt+(medalTxt?'，'+medalTxt:'')+'。', true);
+  addLog(meet+' · 100米'+(strokeName()||'混合')+'（'+city+'）：'+rankTxt+(medalTxt?'，'+medalTxt:'')+'。', true);
   if(Math.random() < 0.40) gainItem('card', city, country);
   else if(Math.random() < 0.30) gainItem(pick(GENERICS));
   palPostcard();
@@ -1642,7 +1737,7 @@ function runIntMeetResult(meet, city, country, rivals, hits, fan){
   let extra = '';
   [0.8, 0.6, 0.4].forEach(ch=>{ if(Math.random() < ch){ const e = makeFriend(city, true); if(e) extra += e; } });
   const bonusTxt = '<span style="font-size:12px;color:var(--ink-soft)">（划水节奏 '+hits+'/8，发挥'+(bonus>=0?'+':'')+bonus+'）</span>';
-  showModal(meet, city+'的水深比家里深。<br><br>'+bonusTxt+'<br><br>'+S.name+'拿到了<b>'+rankTxt+'</b>'+(medalTxt?'，'+medalTxt:'')+'。'+fanLine(fan, rank)+extra);
+  showModal(meet+' · 100米'+(strokeName()||'混合'), city+'的水深比家里深。<br><br>'+bonusTxt+'<br><br>'+S.name+'拿到了<b>'+rankTxt+'</b>'+(medalTxt?'，'+medalTxt:'')+'。'+fanLine(fan, rank)+extra);
   if(meet==='奥运会' && rank===1){ forceEnd('champion'); }
   S.intCount = 0;
   save();
@@ -1882,7 +1977,7 @@ function wxReply(i, k){
     st.draw();
   }, 1150);
 }
-function closeModal(){ sfx('page'); $('modal').classList.remove('on'); $('modal').classList.remove('above'); flushMilestones(); }
+function closeModal(){ sfx('page'); $('modal').classList.remove('on'); $('modal').classList.remove('above'); flushMilestones(); drainEnvelope(); }
 /* 手账分页：每页 10 条，页码可点 */
 let _logPage = 0;
 function renderLog(){
@@ -2152,6 +2247,9 @@ function render(){
   renderLog();
   renderAch();
   renderAssessNote();
+  renderStrokeNote();
+  drawRoom();
+  renderRoom();
 
   renderFriends();
   $('friendHint').textContent = S.friends.length ? ('已结识 '+S.metIdx.length+'/'+S.roster.length+' 人 · 好友们让训练效果 +'+(Math.round(Math.min(S.friends.length,10)*(has('sj')?0.3:0.2)*100)/10)+'% · 今天还能聊 '+(chatLimit()-(S.chats||0))+' 次') : '还没有朋友。去大城市比赛，会认识别的地区的人。';
@@ -2233,7 +2331,7 @@ function showModal(title, body, buttons){
     const el = document.createElement('button');
     el.className = 'btn small';
     el.textContent = b.label;
-    el.onclick = () => { sfx('tap'); $('modal').classList.remove('on'); if(b.cb) b.cb(); if(S && !S.over) render(); flushMilestones(); };
+    el.onclick = () => { sfx('tap'); $('modal').classList.remove('on'); if(b.cb) b.cb(); if(S && !S.over) render(); flushMilestones(); drainEnvelope(); };
     box.appendChild(el);
   });
   $('modal').classList.add('on');
@@ -2329,6 +2427,21 @@ $('btnSaveNow').onclick = ()=>{
 $('btnHelp').onclick = ()=>{ sfx('tap'); showHelp(); };
 $('btnHome').onclick = ()=>{ sfx('page'); backHome(); };
 $('btnResume').onclick = ()=>{ sfx('page'); resumeGame(); };
+$('btnAchHome').onclick = ()=>{ sfx('page'); showAchHome(); };
+/* 首页看成就：直接读存档里的成就记录，不进游戏 */
+function showAchHome(){
+  let o = null;
+  try{ o = JSON.parse(localStorage.getItem(SAVE_KEY)||'null'); }catch(e){}
+  if(!o){ toast('还没有正在进行的旅程'); return; }
+  const ach = o.ach || {};
+  const rows = ACH.map(a=>{
+    const got = !!ach[a.id];
+    return '<div class="meetItem" style="text-align:left;'+(got?'':'opacity:.5;')+'">'+(got?'🏆':'✧')+' <b>'+a.t+'</b>'+(got?'':'<br><span style="font-size:12px;color:var(--ink-soft)">'+a.hint+'</span>')+'</div>';
+  }).join('');
+  const n = ACH.filter(a=>ach[a.id]).length;
+  showModal('我 的 成 就 · '+(o.name||''),
+    '已解锁 '+n+' / '+ACH.length+'（'+o.name+' · 第 '+o.day+' 天）<br><br>'+rows);
+}
 
 /* 回到首页：自动存档，回到开局页（存档保留，可「继续手账」回来） */
 function backHome(){
@@ -2362,6 +2475,228 @@ function showEndSummary(){
     btns:[{label:'重新翻开一本手账', cb:resetGame}]});
   flushMilestones();
 }
+/* ===== 4x100 接力：挑三个伙伴，一起游 ===== */
+function friendPower(f){ return Math.round(55 + (f.aff||0)*0.45); }
+function relayRow(f, i){
+  const on = window._relaySel.indexOf(i) > -1;
+  return '<button class="pBtn'+(on?' on':'')+'" onclick="relayPick('+i+')">'+f.name+'（'+f.city+'）战力 '+friendPower(f)+(on?' ✓':'')+'</button>';
+}
+function relayPick(i){
+  const sel = window._relaySel;
+  const at = sel.indexOf(i);
+  if(at > -1) sel.splice(at,1);
+  else { if(sel.length>=3){ toast('最多带三个伙伴'); return; } sel.push(i); }
+  sfx('tap');
+  drawRelayModal();
+}
+function drawRelayModal(){
+  const sel = window._relaySel;
+  const fsum = sel.reduce((a,i)=>a+friendPower(S.friends[i]),0);
+  showModal('4 × 100 接 力',
+    '挑三个队友站上出发台——<b>他们的好感度就是战力</b>。<br><br><span style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center">'
+    + S.friends.map((f,i)=>relayRow(f,i)).join('') + '</span><br><br>已选 <b>'+sel.length+'/3</b> · 队伍战力 <b>'+(fsum? fsum + 100 : '—')+'</b>',
+    sel.length===3 ? [{label:'出 发 台 见', cb:runRelay}] : [{label:'人还没挑够', cb:()=>{}}]);
+}
+function offerRelay(){
+  window._relaySel = [];
+  if($('modal').classList.contains('on') || _mq.length){ _mq.push({fn:offerRelay}); return; }
+  drawRelayModal();
+}
+function runRelay(){
+  const sel = window._relaySel || [];
+  const mates = sel.map(i=>S.friends[i]).filter(Boolean);
+  if(mates.length < 3){ toast('人还没挑够'); return; }
+  openSwimGame(hits=>runRelayResult(mates, hits), {rounds:8, title:'接 力 · 第 四 棒'});
+}
+function runRelayResult(mates, hits){
+  const w = strokeW();
+  const mine = S.talent*w.talent + S.tech*w.tech + S.strength*w.strength + S.diligence*w.dil + (100-S.fatigue)*0.10 + R(14)-7 + (hits*2-8);
+  const fsum = mates.reduce((a,f)=>a+friendPower(f),0);
+  const team = mine*0.34 + fsum*0.22 + R(10)-5;
+  const tier = MEET_TIERS[Math.min(S.trialIdx, MEET_TIERS.length)-1];
+  let better = 0;
+  for(let i=0;i<7;i++){
+    const rv = tier.rivals[0]*0.9 + Math.random()*(tier.rivals[1]-tier.rivals[0])*0.9;
+    if(rv > team) better++;
+  }
+  const rank = better+1;
+  let txt = '';
+  if(rank===1){
+    gainItem('relay');
+    mates.forEach(f=>{ f.aff = Math.min(100,(f.aff||0)+3); checkAffStage(f); });
+    txt = '四道水花叠成一道。<b>冠军！</b>纪念棒人手一根——不对，只有你手账里有。三位伙伴好感 +3。';
+    sfx('win');
+  } else {
+    txt = '第<b>'+rank+'</b>名。交接棒没有掉，就已经是最好的结果。';
+  }
+  addLog('4x100 接力（与'+mates.map(f=>f.name).join('、')+'）：第'+rank+'名。', true);
+  save();
+  showModal('接 力 · 结 果',
+    '出检录口的时候，三个伙伴互相拍了拍肩膀。<br><br>你的这一棒：划水节奏 '+hits+'/8<br>队伍总战力：'+Math.round(team)+'<br><br>'+txt);
+}
+
+/* ===== 房间：一面会收集回忆的墙 ===== */
+const ROOM_CARD_SLOTS  = [{x:36,y:54},{x:114,y:54},{x:192,y:54},{x:36,y:116},{x:114,y:116},{x:192,y:116}];
+const ROOM_SHELF_SLOTS = [{x:300,y:186},{x:352,y:186},{x:404,y:186},{x:300,y:244},{x:352,y:244},{x:404,y:244}];
+const _roomImgs = {};
+function roomImg(url){
+  if(!url) return null;
+  if(_roomImgs[url]) return _roomImgs[url].ok ? _roomImgs[url].img : null;
+  const im = new Image();
+  const rec = {img:im, ok:false};
+  im.onload = ()=>{ rec.ok = true; drawRoom(); };
+  im.src = url;
+  _roomImgs[url] = rec;
+  return null;
+}
+function itemName(key){
+  if(key.indexOf('card@')===0){ return key.split('@')[1]+'明信片'; }
+  if(key.indexOf('plush@')===0){ return key.split('@')[1]+'吉祥物'; }
+  const sv = SOUVENIRS.find(x=>x.id===key);
+  return sv ? sv.name : key;
+}
+function itemIcon(key){
+  if(key.indexOf('card@')===0) return '🏙️';
+  if(key.indexOf('plush@')===0) return '🧸';
+  const sv = SOUVENIRS.find(x=>x.id===key);
+  return sv ? sv.icon : '🎁';
+}
+function itemPix(key){
+  if(key.indexOf('card@')===0){
+    const po = photoOf(key.split('@')[1]);
+    return po && po.pix ? po.pix : null;
+  }
+  return null;
+}
+function drawRoom(){
+  const cv = $('roomWall'); if(!cv) return;
+  const g = cv.getContext('2d');
+  if(!S.wall) S.wall = {card:{}, shelf:{}};
+  const P = (x,y,w,h,c)=>{ g.fillStyle=c; g.fillRect(x,y,w,h); };
+  // 灰紫墙面 + 踢脚线 + 地板
+  const grad = g.createLinearGradient(0,0,0,300);
+  grad.addColorStop(0,'#9d92b2'); grad.addColorStop(1,'#b3a8c4');
+  g.fillStyle = grad; g.fillRect(0,0,480,268);
+  P(0,268,480,10,'#6d637f'); P(0,278,480,22,'#4a4158');
+  // 窗（夜空+月亮，呼应泳池夜色）
+  P(368,36,84,96,'#3a3550'); P(372,40,76,88,'#1d3a52'); P(374,42,72,84,'#16324a');
+  g.fillStyle='#f2e8c8'; g.beginPath(); g.arc(424,66,12,0,7); g.fill();
+  P(374,60,72,2,'rgba(255,255,255,.15)'); P(374,84,72,2,'rgba(255,255,255,.12)'); P(374,108,72,2,'rgba(255,255,255,.10)');
+  P(406,40,4,88,'#3a3550'); P(372,80,76,4,'#3a3550');
+  // 串灯
+  const LC = ['#ffe28a','#a8e6cf','#e8a0c0','#aee5f2'];
+  g.strokeStyle='rgba(255,255,255,.35)';
+  g.beginPath(); g.moveTo(20,26); g.quadraticCurveTo(240,46,460,26); g.stroke();
+  for(let i=0;i<12;i++){
+    const t=i/11, x=20+t*440, y=26+Math.sin(t*Math.PI)*14;
+    g.fillStyle=LC[i%4]; g.beginPath(); g.arc(x,y+5,3.4,0,7); g.fill();
+  }
+  // 软木板 + 白框明信片槽
+  P(24,44,262,158,'#c9a878'); P(24,44,262,4,'#a8885c'); P(24,198,262,4,'#a8885c');
+  ROOM_CARD_SLOTS.forEach((sl,i)=>{
+    const key = S.wall.card[i];
+    P(sl.x-3,sl.y-3,72,56,'#f7f4ec'); // 拍立得白框
+    if(key){
+      const pix = itemPix(key);
+      const im = pix ? roomImg(pix) : null;
+      if(im){ g.drawImage(im, sl.x, sl.y, 66, 44); }
+      else {
+        P(sl.x,sl.y,66,44,'#8fb8cc');
+        P(sl.x,sl.y+26,66,18,'#6d98ad');
+        g.fillStyle='#fff'; g.font='9px sans-serif'; g.textAlign='center';
+        g.fillText(key.split('@')[1], sl.x+33, sl.y+38);
+      }
+      g.fillStyle='#d65a5a'; g.beginPath(); g.arc(sl.x+33,sl.y-1,3,0,7); g.fill();
+    } else {
+      P(sl.x,sl.y,66,44,'rgba(0,0,0,.12)');
+      g.fillStyle='rgba(255,255,255,.5)'; g.font='16px sans-serif'; g.textAlign='center';
+      g.fillText('+', sl.x+33, sl.y+28);
+    }
+  });
+  // 木搁板 x2 + 纪念品
+  [186,244].forEach(sy=>{
+    P(292,sy+40,152,6,'#8a6a4a'); P(292,sy+46,152,4,'#6d5238');
+    const brg = g.createLinearGradient(0,sy,0,sy+40); brg.addColorStop(0,'rgba(0,0,0,0)'); brg.addColorStop(1,'rgba(0,0,0,.18)');
+    g.fillStyle=brg; g.fillRect(292,sy,152,40);
+  });
+  ROOM_SHELF_SLOTS.forEach((sl,i)=>{
+    const key = S.wall.shelf[i];
+    if(key){
+      g.font='30px serif'; g.textAlign='center';
+      g.fillText(itemIcon(key), sl.x+20, sl.y+32);
+      g.fillStyle='rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(sl.x+20,sl.y+41,14,3,0,0,7); g.fill();
+    } else {
+      g.fillStyle='rgba(255,255,255,.28)'; g.font='18px sans-serif'; g.textAlign='center';
+      g.fillText('·', sl.x+20, sl.y+26);
+    }
+  });
+  // 奖牌轨：按奖牌数画奖牌
+  P(24,224,240,4,'#8a6a4a');
+  const medals = [];
+  for(let i=0;i<S.medals.gold;i++) medals.push('#ffd76a');
+  for(let i=0;i<S.medals.silver;i++) medals.push('#d9d9e2');
+  for(let i=0;i<S.medals.bronze;i++) medals.push('#d99a5a');
+  medals.slice(0,10).forEach((c,i)=>{
+    const mx = 36+i*23;
+    g.strokeStyle='#c9c2b2'; g.beginPath(); g.moveTo(mx,224); g.lineTo(mx,238); g.stroke();
+    g.fillStyle=c; g.beginPath(); g.arc(mx,245,7,0,7); g.fill();
+    g.fillStyle='rgba(0,0,0,.2)'; g.beginPath(); g.arc(mx-2,243,2.4,0,7); g.fill();
+  });
+  g.fillStyle='rgba(255,255,255,.75)'; g.font='12px sans-serif'; g.textAlign='left';
+  g.fillText('奖牌 🥇'+S.medals.gold+' 🥈'+S.medals.silver+' 🥉'+S.medals.bronze, 24, 262);
+  // 右下角：床头小桌 + 台灯
+  P(372,240,92,28,'#5a4636'); P(380,214,8,26,'#5a4636');
+  P(376,196,16,20,'#e8c88a'); P(380,216,4,4,'#5a4636');
+  g.fillStyle='rgba(232,200,138,.25)'; g.beginPath(); g.moveTo(376,214); g.lineTo(392,214); g.lineTo(404,268); g.lineTo(364,268); g.fill();
+  // 足迹
+  const cn = CITIES.filter(c=>S.dex.cn[c]).length, it = INT_LOCS.filter(l=>S.dex.intl[l.country]).length;
+  g.fillStyle='rgba(255,255,255,.6)'; g.font='11px sans-serif'; g.textAlign='left';
+  g.fillText('足迹 '+cn+'/'+CITIES.length+' · '+it+'/'+INT_LOCS.length, 330, 288);
+}
+function roomClick(e){
+  const cv = $('roomWall');
+  const r = cv.getBoundingClientRect();
+  const x = (e.clientX - r.left) * (cv.width/r.width);
+  const y = (e.clientY - r.top) * (cv.height/r.height);
+  const hit = (sl)=> x>=sl.x-4 && x<=sl.x+74 && y>=sl.y-4 && y<=sl.y+56;
+  for(const i in S.wall.card){
+    if(hit(ROOM_CARD_SLOTS[i])){ delete S.wall.card[i]; sfx('page'); save(); render(); return; }
+  }
+  for(const i in S.wall.shelf){
+    const sl = ROOM_SHELF_SLOTS[i];
+    if(x>=sl.x-4 && x<=sl.x+44 && y>=sl.y-4 && y<=sl.y+48){ delete S.wall.shelf[i]; sfx('page'); save(); render(); return; }
+  }
+}
+function renderRoom(){
+  const box = $('roomBtns'); if(!box) return;
+  const cards = Object.keys(S.items).filter(k=>k.indexOf('card@')===0);
+  const shelfs = Object.keys(S.items).filter(k=>k.indexOf('plush@')===0 || SOUVENIRS.some(sv=>sv.id===k));
+  const usedCard = Object.keys(S.wall.card).length, usedShelf = Object.keys(S.wall.shelf).length;
+  let html = '';
+  const hangBtn = (key, kind, full)=>{
+    const hung = Object.values(S.wall[kind]).indexOf(key) > -1;
+    return '<button class="pBtn" onclick="roomToggle(\''+kind+'\',\''+key+'\')">'+itemIcon(key)+' '+itemName(key)+(hung?'（取下）':(full?'（满了）':'（挂上）'))+'</button>';
+  };
+  cards.forEach(k=>{ html += hangBtn(k, 'card', usedCard>=6 && Object.values(S.wall.card).indexOf(k)<0); });
+  shelfs.forEach(k=>{ html += hangBtn(k, 'shelf', usedShelf>=6 && Object.values(S.wall.shelf).indexOf(k)<0); });
+  box.innerHTML = html || '<div class="hint">比赛和训练会带来明信片和纪念品——拿到手就能钉上这面墙。</div>';
+  $('roomHint').textContent = '墙上能钉 6 张明信片、摆 6 件纪念品；点墙上的东西可以取下来。奖牌会自己挂上奖牌轨。';
+}
+function roomToggle(kind, key){
+  const wall = S.wall[kind];
+  const cur = Object.values(wall).indexOf(key);
+  if(cur > -1){ delete wall[Object.keys(wall)[cur]]; }
+  else {
+    const cap = kind==='card' ? 6 : 6;
+    if(Object.keys(wall).length >= cap){ toast('墙上满了，先取下一件'); return; }
+    let slot = 0;
+    while(wall[slot]!==undefined) slot++;
+    wall[slot] = key;
+    sfx('sparkle');
+  }
+  save(); render();
+}
+
 /* 玩法说明：分类速查 */
 function showHelp(){
   $('modal').classList.add('above');
@@ -2379,6 +2714,8 @@ function showHelp(){
       '选拔赛通过才能解锁更高级别的比赛',
       '国内难度：城市邀请赛 < 省锦标赛 < 全国大学生 < 冠军赛 < 国家队选拔',
       '国际更高一档：亚运会 < 洲际赛 < 世锦赛 < 奥运会（最高）',
+      '练满一年教练会定你的主项（自由/蛙/蝶/仰）：主项改变天赋/技巧/力量/勤奋的比赛权重，第二年是强制二选一',
+      '结识 3 个好友后偶尔有 4x100 接力：队友战力看好感度，夺冠有独有纪念品',
       '名次 = 天赋35% + 技巧30% + 力量15% + 勤奋10% + 状态10%，再加划水发挥（命中×2−8）、好友加油 +5、装备加成，随机只占 ±7',
       '对手 7 人按赛事级别出分，级别越高越难爆冷'
     ])) +
@@ -2422,7 +2759,7 @@ if(load()){
   render();
   if(S.over){ showEndSummary(); }
 }
-if(localStorage.getItem(SAVE_KEY)){ $('btnResume').style.display=''; }
+if(localStorage.getItem(SAVE_KEY)){ $('btnResume').style.display=''; $('btnAchHome').style.display=''; }
 /* 开门第一问：新客还是老朋友 */
 function showStartAsk(){
   showModal('游 泳 馆 开 门 了',
