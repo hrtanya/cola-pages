@@ -258,6 +258,14 @@
   /* ---------- 训练节奏小游戏 ---------- */
   #swimGame{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(4,32,46,.55);z-index:55;}
   #swimGame.on{display:flex;}
+  /* ---------- 比赛周位面 ---------- */
+  #plane{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(4,32,46,.55);z-index:49;}
+  #plane.on{display:flex;}
+  .plCard{background:rgba(8,44,62,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.18);border-radius:18px;padding:24px 22px 20px;width:94%;max-width:560px;text-align:center;box-shadow:0 18px 50px rgba(4,32,46,.4);}
+  #plMap{display:block;image-rendering:pixelated;width:100%;border-radius:10px;margin:8px 0 6px;cursor:pointer;}
+  #plStats{display:flex;gap:18px;justify-content:center;font-size:13px;color:#ffe9b8;margin:2px 0 0;}
+  #plMsg{font-size:13px;color:#fff;min-height:44px;margin:4px 0 10px;line-height:1.7;}
+  #plBtns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
   .sgCard{background:rgba(8,44,62,.9);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.18);border-radius:18px;padding:34px 30px;width:86%;max-width:380px;text-align:center;box-shadow:0 18px 50px rgba(4,32,46,.4);}
   .sgTitle{font-size:14px;letter-spacing:.25em;color:var(--accent);margin-bottom:8px;}
   .sgSub{font-size:12px;color:var(--ink-soft);margin-bottom:20px;min-height:18px;}
@@ -404,6 +412,7 @@
 </div></div>
 <div id="modal"><div class="modalCard"><div class="mt" id="mdTitle"></div><div class="mb" id="mdBody"></div><div id="mdBtns"></div></div></div>
 <div id="swimGame"><div class="sgCard"><div class="sgTitle" id="sgTitle">决 赛 · 划 水 节 奏</div><div class="sgFan" id="sgFan"><canvas id="fanCv" width="60" height="14"></canvas><span id="sgFanName"></span></div><div class="sgSub" id="sgSub">在白线滑进绿色区域时按「划水」</div><div class="sgBar"><div class="sgZone" id="sgZone"></div><div class="sgCore"></div><div class="sgNeedle" id="sgNeedle"></div></div><button class="btn sgTap" id="sgTap" onclick="sgTap()">划 水 ！</button><div class="sgDots" id="sgDots"></div></div></div>
+<div id="plane"><div class="plCard"><div class="sgTitle" id="plTitle">大 赛 · 第 1 天 / 7</div><div id="plStats"></div><canvas id="plMap" width="320" height="200" onclick="planeClick(event)" onmousemove="planeHover(event)" onmouseleave="planeHoverOut()"></canvas><div id="plMsg"></div><div id="plBtns"></div></div></div>
 <div id="envWrap"><div class="envStage"><div class="envLetter" id="envLetter"></div><canvas id="envCv" width="64" height="48" onclick="envOpen()"></canvas><div class="envHint" id="envHint">点一下，拆开</div></div></div>
 <div class="toast" id="toast"></div>
 
@@ -1517,23 +1526,27 @@ function scheduleMeet(){
 function offerMeet(){
   if(S.meetDay !== null && S.day >= S.meetDay){
     const tier = MEET_TIERS[Math.min(S.trialIdx,MEET_TIERS.length)-1];
+    const tIdx = MEET_TIERS.indexOf(tier);
     const city = pick(CITIES);
     fireEnvelope('比 赛 邀 请',
-      '<b>'+tier.name+'</b>（'+city+'）今天开赛。<br><br>你的状态：疲惫 '+S.fatigue+(S.sick?' · 还在生病':'')+'<br><br>去吗？赛场上说不定能认识别处的人。',
-      ()=>{ if(Math.random() < 0.4){ offerSponsor(tier, city); } else { runMeet(tier, city); } },
+      '<b>'+tier.name+'</b>（'+city+'）今天开赛。<br><br>你的状态：疲惫 '+S.fatigue+(S.sick?' · 还在生病':'')+'<br><br>'+(tIdx>=1?'这是大赛——<b>赛程七天，吃住都在赛会</b>。':'赛场上说不定能认识别处的人。')+'<br><br>去吗？',
+      ()=>{ if(Math.random() < 0.4){ offerSponsor(tier, tIdx, city); } else { goMeet(tier, tIdx, city); } },
       ()=>{ S.meetDistract=false; addLog('推掉了'+city+'的比赛，继续闷头训练。'); S.meetDay = S.day + 30+R(30); });
   }
 }
+function goMeet(tier, tIdx, city){
+  if(tIdx >= 1){ startMeetPlane(tier, tIdx, city, {}); } else { runMeet(tier, city); }
+}
 /* 赞助商摊位：去了赛场才有概率遇到；买道具有代价（本场比赛发挥 -10） */
-function offerSponsor(tier, city){
+function offerSponsor(tier, tIdx, city){
   const picks = GEAR.slice().sort(()=>Math.random()-0.5).slice(0,2);
   const rows = picks.map(p=>p.icon+' <b>'+p.name+'</b> —— '+p.desc.replace('使用后：','')).join('<br>');
   showModal('赞 助 商 摊 位',
-    '刚到'+city+'的场馆门口，赞助商支起了小摊，冲你招手：<br><br>'+rows+'<br><br><span style="font-size:12px;color:var(--ink-soft)">买装备难免分心——这场比赛发挥 -10，道具会进「道具」板块随时可用</span>',
+    '刚到'+city+'的场馆门口，赞助商支起了小摊，冲你招手：<br><br>'+rows+'<br><br><span style="font-size:12px;color:var(--ink-soft)">买装备难免分心——第一个决赛日发挥 -10，道具会进「道具」板块随时可用</span>',
     [
-      {label:'买 · '+picks[0].name, cb:()=>{ sfx('coin'); S.gear[picks[0].id]=(S.gear[picks[0].id]||0)+1; S.meetDistract=true; addLog('在赞助商摊位买了'+picks[0].name+'（本场比赛发挥 -10）。', true); save(); runMeet(tier, city); }},
-      {label:'买 · '+picks[1].name, cb:()=>{ sfx('coin'); S.gear[picks[1].id]=(S.gear[picks[1].id]||0)+1; S.meetDistract=true; addLog('在赞助商摊位买了'+picks[1].name+'（本场比赛发挥 -10）。', true); save(); runMeet(tier, city); }},
-      {label:'什么都不买', cb:()=>{ addLog('从赞助商摊位前走过，稳了稳心神。'); runMeet(tier, city); }}
+      {label:'买 · '+picks[0].name, cb:()=>{ sfx('coin'); S.gear[picks[0].id]=(S.gear[picks[0].id]||0)+1; S.meetDistract=true; addLog('在赞助商摊位买了'+picks[0].name+'（第一个决赛日发挥 -10）。', true); save(); goMeet(tier, tIdx, city); }},
+      {label:'买 · '+picks[1].name, cb:()=>{ sfx('coin'); S.gear[picks[1].id]=(S.gear[picks[1].id]||0)+1; S.meetDistract=true; addLog('在赞助商摊位买了'+picks[1].name+'（第一个决赛日发挥 -10）。', true); save(); goMeet(tier, tIdx, city); }},
+      {label:'什么都不买', cb:()=>{ addLog('从赞助商摊位前走过，稳了稳心神。'); goMeet(tier, tIdx, city); }}
     ]);
 }
 function runMeet(tier, city){
@@ -1685,6 +1698,271 @@ function careerEndCheck(){
 }
 function careerEnd(){ forceEnd('injury'); }
 
+/* ================= 比赛周位面（大赛专属 7 天） ================= */
+const PL_SPOTS = {
+  pool:  {x:14,  y:44,  w:104, h:62},
+  hotel: {x:206, y:24,  w:92,  h:102},
+  park:  {x:126, y:136, w:76,  h:56}
+};
+function startMeetPlane(tier, tIdx, city, opt){
+  opt = opt || {};
+  S.meetDay = null;
+  const main = S.stroke || 'free';
+  const others = ['free','breast','fly','back'].filter(x=>x!==main).sort(()=>Math.random()-0.5);
+  S.meet7 = {
+    on:true, name:tier.name, rivals:tier.rivals, tIdx:tIdx, city:city,
+    intl:!!opt.intl, country:opt.country||'', isOlympic:!!opt.isOlympic,
+    day:1, st:{str:S.strength, tech:S.tech, fat:S.fatigue},
+    events:[others[0], others[1], main], ranks:[], spot:''
+  };
+  addLog('出发去'+city+'打'+tier.name+'——赛程七天，吃住都在赛会。', true);
+  save();
+  openPlane();
+}
+function openPlane(){
+  if(!S.meet7 || !S.meet7.on) return;
+  $('plane').classList.add('on');
+  drawPlaneMap();
+  planeHud('到了'+S.meet7.city+'，比赛周开始。前四天自由安排：去<b>游泳馆</b>试水、回<b>酒店</b>休息，或者去<b>景点</b>逛逛。<br><span style="font-size:12px;color:var(--ink-soft)">点地图上的一栋建筑，度过今天。</span>');
+}
+function planeHud(msg){
+  const m = S.meet7; if(!m) return;
+  $('plTitle').textContent = (m.day>=5 ? '决 赛 日 · 第 '+m.day+' 天' : '大 赛 · 第 '+m.day+' 天')+' / 7';
+  $('plStats').innerHTML = '<span>💪 力量 '+m.st.str+'</span><span>🎯 技巧 '+m.st.tech+'</span><span>😵 疲惫 '+m.st.fat+'</span>';
+  $('plMsg').innerHTML = msg || '';
+  $('plMap').style.filter = m.day>=5 ? 'grayscale(.35) opacity(.75)' : '';
+  const bx = $('plBtns'); bx.innerHTML = '';
+  if(m.day >= 5){
+    const ev = m.events[m.day-5];
+    const b = document.createElement('button'); b.className='btn small';
+    b.textContent = '入 场 · 100米'+strokeNameOf(ev);
+    b.onclick = ()=>{ sfx('splash'); openSwimGame(h=>planeDayResult(h, ev), {rounds:8, title:'决 赛 · 100米'+strokeNameOf(ev)}); };
+    bx.appendChild(b);
+  }
+  const q = document.createElement('button'); q.className='btn small'; q.style.opacity=.55;
+  q.textContent = '中途退赛';
+  q.onclick = ()=>planeQuit();
+  bx.appendChild(q);
+}
+function strokeNameOf(id){ const st = STROKES.find(x=>x.id===id); return st ? st.name : '混合'; }
+let PL_HOVER = '';
+function planeHover(e){
+  const m = S && S.meet7;
+  if(!m || !m.on || m.day >= 5){ if(PL_HOVER){ PL_HOVER=''; drawPlaneMap(); } return; }
+  let h = '';
+  const r = $('plMap').getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width * 320;
+  const y = (e.clientY - r.top) / r.height * 200;
+  for(const k in PL_SPOTS){
+    const z = PL_SPOTS[k];
+    if(x>=z.x && x<=z.x+z.w && y>=z.y && y<=z.y+z.h){ h = k; break; }
+  }
+  if(h !== PL_HOVER){ PL_HOVER = h; drawPlaneMap(); }
+}
+function planeHoverOut(){
+  if(PL_HOVER){ PL_HOVER = ''; drawPlaneMap(); }
+}
+function planeClick(e){
+  const m = S.meet7; if(!m || !m.on || m.day >= 5) return;
+  const cvp = $('plMap'), r = cvp.getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width * 320;
+  const y = (e.clientY - r.top) / r.height * 200;
+  for(const k in PL_SPOTS){
+    const z = PL_SPOTS[k];
+    if(x>=z.x && x<=z.x+z.w && y>=z.y && y<=z.y+z.h){ planeAct(k); return; }
+  }
+}
+function planeAct(k){
+  const m = S.meet7; if(!m || m.day >= 5) return;
+  const st = m.st;
+  m.spot = k;
+  if(k==='pool'){
+    const t = 2+R(4), s2 = 1+R(3), f = 8+R(5);
+    st.tech = clamp(st.tech+t, 0, 100); st.str = clamp(st.str+s2, 0, 100); st.fat = clamp(st.fat+f, 0, 100);
+    sfx('splash');
+    planeNext('赛前试水：空场的水面很安静，把出发和转身顺了两遍。技巧 +'+t+' · 力量 +'+s2+' · 疲惫 +'+f);
+  }else if(k==='hotel'){
+    const f = 12+R(8), s2 = 2+R(3), t = 1+R(2);
+    st.fat = clamp(st.fat-f, 0, 100); st.str = clamp(st.str+s2, 0, 100); st.tech = clamp(st.tech-t, 0, 100);
+    sfx('rest');
+    planeNext('酒店补觉：窗帘拉上，手机静音，一觉睡到自然醒。疲惫 -'+f+' · 力量 +'+s2+' · 技巧 -'+t);
+  }else{
+    const f = 8+R(6), s2 = 2+R(2), t = 2+R(2);
+    st.fat = clamp(st.fat-f, 0, 100); st.str = clamp(st.str-s2, 0, 100); st.tech = clamp(st.tech-t, 0, 100);
+    let extra = '';
+    if(Math.random() < 0.18){ gainItem(pick(GENERICS)); extra = '顺手买了个小纪念品。'; }
+    sfx('page');
+    planeNext('景点走走：晒晒太阳，脑子放空。疲惫 -'+f+' · 力量 -'+s2+' · 技巧 -'+t+extra);
+  }
+}
+function planeNext(msg){
+  const m = S.meet7;
+  m.day++;
+  save();
+  if(m.day >= 8){ endPlane(); return; }
+  drawPlaneMap();
+  if(m.day >= 5) planeHud('今天有决赛：100米'+strokeNameOf(m.events[m.day-5])+'。<br><span style="font-size:12px;color:var(--ink-soft)">'+msg+'</span>');
+  else planeHud('新的一天，去哪儿？<br><span style="font-size:12px;color:var(--ink-soft)">'+msg+'</span>');
+}
+function planeDayResult(hits, evId){
+  const m = S.meet7;
+  const bonus = hits*2 - 8;
+  const st = m.st;
+  let mine = st.tech*0.45 + st.str*0.35 + (100-st.fat)*0.20 + R(14)-7 + bonus;
+  const notes = [];
+  if(S.suitBuff){ mine += 12; S.suitBuff=false; notes.push('竞速泳衣 +12'); }
+  if(S.meetDistract){ mine -= 10; S.meetDistract=false; notes.push('逛摊分心 -10'); }
+  const closeFs = S.friends.filter(f=>(f.stage||0)>=3);
+  const fan = closeFs.length ? pick(closeFs) : ((S.friends.length && Math.random()<0.4) ? pick(S.friends) : null);
+  if(fan) mine += 5;
+  let better = 0;
+  for(let i=0;i<7;i++){
+    const rv = m.rivals[0] + Math.random()*(m.rivals[1]-m.rivals[0]);
+    if(rv > mine) better++;
+  }
+  const rank = better+1;
+  m.ranks.push(rank);
+  S.certs = (S.certs||0) + 1;
+  let extra = fanLine(fan, rank);
+  if(Math.random() < (m.intl?0.5:0.35)){ const e2 = makeFriend(m.city, m.intl); if(e2) extra += e2; }
+  const bonusTxt = '<span style="font-size:12px;color:var(--ink-soft)">（划水节奏 '+hits+'/8，发挥'+(bonus>=0?'+':'')+bonus+(notes.length?'；'+notes.join('，'):'')+'）</span>';
+  queueModal('决 赛 · 100米'+strokeNameOf(evId),
+    m.city+'的看台坐满了人。八条泳道，一声哨响。<br><br>'+bonusTxt+'<br><br>'+S.name+'拿到<b>第'+rank+'名</b>，获颁一张<b>大赛证书</b>。'+extra+'<br><br><span style="font-size:12px;color:var(--ink-soft)">大赛单项只发证书；奖牌要看七天后的总排名。</span>',
+    [{label:'去吃自助餐', cb:()=>planeBuffet()}]);
+}
+const BUFFET_BAD = ['冰镇生蚝','凉拌毛蚶','隔夜的小龙虾'];
+const BUFFET_GOOD = ['明炉烤牛排','白灼大虾','清蒸鲈鱼','芝士焗意面','奶油蘑菇汤','蜜汁烤鸡'];
+function planeBuffet(){
+  const goods = BUFFET_GOOD.slice().sort(()=>Math.random()-0.5).slice(0,2);
+  const dishes = [{n:goods[0], k:'str'},{n:goods[1], k:'tech'},{n:pick(BUFFET_BAD), k:'bad'}].sort(()=>Math.random()-0.5);
+  queueModal('运 动 员 自 助 餐',
+    '赛后和队友涌进酒店餐厅。餐台上今天有你惦记的三样：<br><br>'+dishes.map(d=>'🍽 '+d.n).join('<br>')+'<br><br><span style="font-size:12px;color:var(--ink-soft)">大赛期间吃坏肚子，可就不是小事了……</span>',
+    dishes.map(d=>({label:d.n, cb:()=>planeEat(d)})));
+}
+function planeEat(d){
+  const m = S.meet7, st = m.st;
+  let msg = '';
+  if(d.k==='bad'){
+    const s2 = 4+R(4), f = 5+R(5);
+    st.str = clamp(st.str-s2, 0, 100); st.fat = clamp(st.fat+f, 0, 100);
+    sfx('sad');
+    msg = '半夜跑了两趟卫生间……<br><br>力量 -'+s2+' · 疲惫 +'+f;
+  }else if(d.k==='str'){
+    const s2 = 3+R(3);
+    st.str = clamp(st.str+s2, 0, 100);
+    sfx('chime');
+    msg = '肉管够，练力量的都懂。<br><br>力量 +'+s2;
+  }else{
+    const t2 = 3+R(3);
+    st.tech = clamp(st.tech+t2, 0, 100);
+    sfx('chime');
+    msg = '吃得清淡又补，水感都清亮了。<br><br>技巧 +'+t2;
+  }
+  queueModal(d.n, msg, [{label:'回房间', cb:()=>planeNext('')}]);
+}
+function endPlane(){
+  const m = S.meet7;
+  const total = m.ranks.reduce((a,b)=>a+b, 0);
+  let better = 0;
+  for(let i=0;i<7;i++){
+    const rt = (m.rivals[0] + Math.random()*(m.rivals[1]-m.rivals[0]))*3;
+    if(rt < total) better++;
+  }
+  const rank = better+1;
+  if(rank===1){ S.goldStreak = (S.goldStreak||0)+1; } else { S.goldStreak = 0; }
+  let medalTxt = '', rankTxt = '总排名第'+rank+'名';
+  if(rank===1){ S.medals.gold++; medalTxt='🥇 金牌'; sfx('win'); }
+  else if(rank===2){ S.medals.silver++; medalTxt='🥈 银牌'; }
+  else if(rank===3){ S.medals.bronze++; medalTxt='🥉 铜牌'; }
+  S.meets.push({day:S.day, city:m.city, name:m.name+'（七日）', rank});
+  addLog(m.name+'（'+m.city+'）七日赛程结束：单项 '+m.ranks.map(r=>'第'+r).join(' / ')+'，'+rankTxt+(medalTxt?'，'+medalTxt:'，与奖牌擦肩')+'，带走 3 张大赛证书。', true);
+  if(Math.random() < (m.intl?0.40:0.30)) gainItem('card', m.city, m.country);
+  else if(Math.random() < 0.25) gainItem(pick(GENERICS));
+  palPostcard();
+  const wasOly = m.isOlympic;
+  S.meet7 = null;
+  if(m.intl){ S.intCount = 0; }
+  else { const wait = 40+R(40); S.meetDay = S.day + wait; addLog('下一场比赛定在'+wait+'天后。'); }
+  S.meetDistract = false;
+  save();
+  $('plane').classList.remove('on');
+  render();
+  const det = m.ranks.map((r,i)=>'第'+(i+1)+'个决赛日：第'+r+'名').join('<br>');
+  queueModal('总 排 名 · '+m.name,
+    '七天——泳池、酒店、街道和看台，到这里收卷。<br><br>'+det+'<br><br><b>'+S.name+'</b>——'+rankTxt+(medalTxt?'，'+medalTxt:'')+'。<br>三天单项的证书都在手上了。'+(rank<=3?'<br><span style="font-size:12px;color:var(--ink-soft)">这枚奖牌，会挂进房间墙的奖牌轨。</span>':''),
+    [{label:'收拾行李回训练馆', cb:()=>{ if(wasOly && rank===1){ forceEnd('champion'); } }}]);
+}
+function planeQuit(){
+  const m = S.meet7; if(!m) return;
+  queueModal('中 途 退 赛', '真的要退出'+m.name+'吗？没有成绩，没有奖牌，只有一张回程票。', [
+    {label:'再坚持一下', cb:()=>{}},
+    {label:'退赛回家', cb:()=>{
+      S.meet7 = null;
+      if(m.intl){ S.intCount = 0; }
+      else { S.meetDay = S.day + 30 + R(30); }
+      addLog('从'+m.city+'中途退赛，提前回了训练馆。', true);
+      save();
+      $('plane').classList.remove('on');
+      render();
+    }}
+  ]);
+}
+function drawPlaneMap(){
+  const c = $('plMap'), g = c.getContext('2d');
+  const m = S.meet7;
+  g.clearRect(0,0,320,200);
+  g.fillStyle='#cdc5e8'; g.fillRect(0,0,320,92);
+  g.fillStyle='#bfb5e0'; g.fillRect(0,70,320,22);
+  g.fillStyle='#eae5f7'; g.fillRect(30,16,26,6); g.fillRect(38,10,14,6); g.fillRect(210,26,22,6); g.fillRect(216,20,12,6);
+  g.fillStyle='#9db99a'; g.fillRect(0,92,320,108);
+  g.fillStyle='#93ae90'; for(let i=0;i<24;i++) g.fillRect((i*37)%320, 96+(i*13)%100, 3, 2);
+  g.fillStyle='#8b8496'; g.fillRect(0,118,320,16);
+  g.fillStyle='#f4f0e2'; for(let x=4;x<320;x+=22) g.fillRect(x,125,10,2);
+  const canHover = m && m.on && m.day < 5;
+  const dy = k => (canHover && PL_HOVER===k) ? -4 : 0;
+  // 游泳馆
+  const dp = dy('pool');
+  g.fillStyle='#5f7fb8'; g.fillRect(20,58+dp,92,46);
+  g.fillStyle='#4a6a9e'; g.fillRect(20,52+dp,92,8);
+  g.fillStyle='#dfe9ff'; g.fillRect(28,70+dp,18,12); g.fillRect(54,70+dp,18,12); g.fillRect(80,70+dp,18,12);
+  g.fillStyle='#7ec7e7'; g.fillRect(24,92+dp,84,10);
+  g.fillStyle='#ffffff'; for(let x=28;x<104;x+=10) g.fillRect(x,95+dp,4,1);
+  g.fillStyle='#ffe9b8'; g.fillRect(58,84+dp,16,10);
+  g.fillStyle='#8b8496'; g.fillRect(108,42+dp,2,16);
+  g.fillStyle='#d96a6a'; g.fillRect(110,42+dp,8,5);
+  // 酒店
+  const dh = dy('hotel');
+  g.fillStyle='#e8d9b8'; g.fillRect(212,34+dh,84,88);
+  g.fillStyle='#d6c39a'; g.fillRect(212,34+dh,84,6);
+  g.fillStyle='#7a92b8'; for(let yy=44;yy<110;yy+=12) for(let xx=220;xx<288;xx+=14) g.fillRect(xx,yy+dh,8,7);
+  g.fillStyle='#d96a6a'; g.fillRect(238,24+dh,32,10);
+  g.fillStyle='#a9825f'; g.fillRect(244,112+dh,20,10);
+  // 景点
+  const dk = dy('park');
+  g.fillStyle='#6f9b6f'; g.fillRect(130,142+dk,68,46);
+  g.fillStyle='#5d8a5d'; g.fillRect(176,158+dk,16,14);
+  g.fillStyle='#6b5340'; g.fillRect(146,158+dk,5,14);
+  g.fillStyle='#c9b48a'; g.fillRect(140,150+dk,18,4); g.fillRect(142,154+dk,14,4);
+  // 悬停高亮描边
+  if(canHover && PL_HOVER){
+    const z = PL_SPOTS[PL_HOVER];
+    g.fillStyle='rgba(255,255,255,.12)'; g.fillRect(z.x, z.y, z.w, z.h);
+    g.strokeStyle='rgba(255,255,255,.85)'; g.lineWidth=1.5;
+    g.strokeRect(z.x-2, z.y-2, z.w+4, z.h+4);
+  }
+  // 小人
+  const spots = {pool:[66,110], hotel:[254,124], park:[164,148]};
+  const p = (m && m.spot && spots[m.spot]) ? spots[m.spot] : [162,124];
+  g.fillStyle='#2b2b3a'; g.fillRect(p[0]-3, p[1], 6, 8);
+  g.fillStyle=skinC(); g.fillRect(p[0]-3, p[1]-6, 6, 6);
+  g.fillStyle='#7ee7cd'; g.fillRect(p[0]-3, p[1]-8, 6, 2);
+  g.font='10px sans-serif'; g.textAlign='center';
+  g.fillStyle='#ffffff'; g.fillText('游 泳 馆', 66, 46); g.fillText('酒 店', 254, 20); g.fillText('景 点', 164, 200);
+  g.fillStyle='rgba(43,43,58,.8)';
+  g.fillText(m && m.day >= 5 ? '决赛日 · 看台见' : '点一栋建筑，度过今天', 160, 110);
+  g.textAlign='start';
+}
+
 /* ================= 国际赛事 ================= */
 function offerInternational(){
   if(S.over) return;
@@ -1699,14 +1977,12 @@ function offerInternational(){
   S.intCount++;
   fireEnvelope(meet==='奥运会' ? '奥 运 会 邀 请' : '国 际 邀 请',
     '一封从<b>'+loc.city+'</b>（'+loc.country+'）寄来的邀请函：<b>'+meet+'</b>'+(isOlympic?'。<br><br><b>这是奥运会。</b>全世界的目光都在这里。':'。<br><br>全世界的快泳手都会去。你的名字，也在名单上。')+'<br><br>去吗？',
-    ()=>runIntMeet(meet, loc.city, loc.country, rivals),
+    ()=>runIntMeet(meet, loc.city, loc.country, rivals, isOlympic),
     ()=>{ S.intCount = 0; addLog('婉拒了'+loc.city+'的邀请，先把国内的路走稳。'); });
 }
-function runIntMeet(meet, city, country, rivals){
+function runIntMeet(meet, city, country, rivals, isOlympic){
   rivals = rivals || INT_RIVALS[meet] || [100,114];
-  const closeFs = S.friends.filter(f=>(f.stage||0)>=3);
-  const fan = closeFs.length ? pick(closeFs) : ((S.friends.length && Math.random()<0.5) ? pick(S.friends) : null);
-  openSwimGame(hits=>runIntMeetResult(meet, city, country, rivals, hits, fan), {rounds:8});
+  startMeetPlane({name:meet+' · 国际', rivals:rivals}, 9, city, {intl:true, country:country, isOlympic:!!isOlympic});
 }
 function runIntMeetResult(meet, city, country, rivals, hits, fan){
   rivals = rivals || INT_RIVALS[meet] || [100,114];
@@ -2189,6 +2465,7 @@ function load(){
     if(S.assess.fails===undefined) S.assess.fails = 0;
     if(S.burn100===undefined) S.burn100 = 0;
     if(S.coachUntil===undefined) S.coachUntil = 0;
+    if(S.meet7===undefined) S.meet7 = null;
     if(!S.globalMult) S.globalMult=1;
     if(!S.restStreak) S.restStreak=0;
     if(!S.startAge) S.startAge = S.age;
@@ -2464,6 +2741,7 @@ function resumeGame(){
   laneP = S.swimX || 0; laneTarget = laneP;
   render();
   if(S.over) showEndSummary();
+  else if(S.meet7 && S.meet7.on) openPlane();
 }
 /* 已结束的存档再次打开时，只重演结算页，不再触发新结局 */
 function showEndSummary(){
@@ -2749,6 +3027,14 @@ function showHelp(){
       '结局只有 5 个，全部会结束生涯：奥运夺冠 / 转行 / 伤病退役 / 队内淘汰 / 40 岁退役',
       '成就不结束生涯，共 7 项：32 岁仍在坚持 / 累计 15 金 / 连胜 10 场 / 图鉴全收集 / 5 位好友满好感 / 结识所有人 / 累计 30 场比赛',
       '成就进度在收藏栏「🏆 成就」页随时可查；合上的手账在首页「回看手账」里'
+    ])) +
+    H('🏨 大赛周 · 七日位面', L([
+      '省锦标赛及以上、全部国际赛走七日赛程，不占训练天数',
+      '前四天点小地图自由安排：游泳馆试水（技巧力量↑疲惫↑）· 酒店休息（疲惫↓力量↑）· 景点游玩（疲惫↓↓属性微降）',
+      '位面数值独立：只看力量 / 技巧 / 疲惫，初始与训练数值一致，赛后不带回',
+      '后三天每天一个决赛单项，主项压轴；QTE 定发挥，每天发大赛证书，不发奖牌',
+      '每天赛后回酒店吃自助餐，三选一——小心吃坏肚子',
+      '第七天结束公布总排名，前三名拿金银铜牌，挂进房间墙奖牌轨'
     ]))
   );
 }
@@ -2758,6 +3044,7 @@ if(load()){
   laneP = S.swimX || 0; laneTarget = laneP;
   render();
   if(S.over){ showEndSummary(); }
+  else if(S.meet7 && S.meet7.on){ openPlane(); }
 }
 if(localStorage.getItem(SAVE_KEY)){ $('btnResume').style.display=''; $('btnAchHome').style.display=''; }
 /* 开门第一问：新客还是老朋友 */
