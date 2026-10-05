@@ -235,6 +235,14 @@
   #roomLabels{position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;overflow:hidden;}
   .rlab{position:absolute;transform:translate(-50%,-50%);font-size:12px;color:#fff;white-space:nowrap;text-shadow:0 1px 2px rgba(30,25,45,.4);line-height:1;}
   .rlabL{transform:translate(0,-50%);color:rgba(255,255,255,.9);}
+  /* 信纸：手写字 + 手账纸质感 */
+  @font-face{font-family:'MailHand';src:url('assets/mail-hand.woff2') format('woff2');font-display:swap;}
+  .letterPaper{background:linear-gradient(168deg,#faf5ea,#efe5d0);border-radius:8px;padding:18px 20px 14px;margin:4px 0;text-align:left;box-shadow:inset 0 0 34px rgba(150,115,60,.10);position:relative;}
+  .letterPaper:before{content:'';position:absolute;left:14px;top:10px;bottom:10px;width:2px;background:rgba(180,140,80,.16);border-radius:2px;}
+  .letterHand{font-family:'MailHand','STXingkai','华文行楷','Xingkai SC','KaiTi','楷体',serif;font-size:17px;line-height:1.95;color:#4a3b26;letter-spacing:.02em;}
+  .letterSign{text-align:right;margin-top:10px;font-family:'MailHand','STXingkai','华文行楷','Xingkai SC','KaiTi','楷体',serif;font-size:15px;color:#8a6f48;}
+  .mailCard{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.55);margin-bottom:8px;cursor:pointer;text-align:left;}
+  .mailCard.unread{background:rgba(255,243,214,.78);}
   #modal.on{display:flex;}
   #setModal{
     position:fixed;inset:0;display:none;align-items:center;justify-content:center;
@@ -362,6 +370,7 @@
       <div class="tab on" data-tab="log">手账</div>
       <div class="tab" data-tab="friends">好友</div>
       <div class="tab" data-tab="items">收藏</div>
+      <div class="tab" data-tab="mail">信箱</div>
       <div class="tab" data-tab="gear">道具</div>
       <div class="tab" data-tab="dex">房间</div>
       <div class="tab" data-tab="medals">战绩</div>
@@ -376,6 +385,10 @@
     <div class="panel" id="panel-items">
       <div id="itemList"></div>
       <div class="hint" id="itemHint"></div>
+    </div>
+    <div class="panel" id="panel-mail">
+      <div id="mailList"></div>
+      <div class="hint" id="mailHint"></div>
     </div>
     <div class="panel" id="panel-gear">
       <div id="gearList"></div>
@@ -478,8 +491,174 @@ const ACH = [
   {id:'grand',   t:'山河与五洲',   hint:'集齐国内 20 城 + 国际 20 国图鉴'},
   {id:'squad',   t:'并肩作战',     hint:'5 位好友的好感都达到 100'},
   {id:'brothers',t:'四海皆兄弟',   hint:'结识所有人物（国内每城 5 人 · 国际每国 10 人）'},
-  {id:'veteran', t:'常青树',       hint:'累计参加 30 场比赛'}
+  {id:'veteran', t:'常青树',       hint:'累计参加 30 场比赛'},
+  {id:'rival', t:'亦敌亦友', hint:'与宿敌交锋 10 场'},
+  {id:'bond',  t:'惺惺相惜', hint:'把宿敌处成交情满格（100）'},
+  {id:'mail',  t:'纸短情长', hint:'收到 15 封粉丝来信'}
 ];
+/* ===== 宿敌线（v13） ===== */
+let _rvQueue = [];
+function drainRival(){ while(_rvQueue.length){ const q = _rvQueue.shift(); queueModal(q.t, q.b, q.opts); } }
+function rivalNew(city){
+  if(S.rival) return;
+  const pool = S.roster.filter(q=>q.r===city);
+  const p = pool.length ? pick(pool) : pick(S.roster);
+  S.rival = { name:p.n, city:p.r, born:S.day, h2h:{w:0,l:0}, pts:20, golds:0, lastYear:S.day, flags:{} };
+  addLog('看台上有道视线跟了你一整场——'+p.r+'的<b>'+p.n+'</b>，同样的项目，同样的眼神。', true);
+}
+function rivalHook(meetName, city, rank, isIntl){
+  _rvQueue = [];
+  if(!S.roster) return '';
+  let first = false;
+  if(!S.rival){
+    if(isIntl || meetName === MEET_TIERS[0].name) return '';
+    rivalNew(city);
+    if(!S.rival) return '';
+    first = true;
+  }
+  const rv = S.rival;
+  rv.met = (rv.met||0) + 1;
+  rv.pts = clamp((rv.pts||20) + 2, 0, 100);
+  let rRank, beat;
+  if(rank === 1){ rRank = 2; beat = false; }
+  else if(Math.random() < 0.45){ rRank = Math.max(1, rank-1); beat = rRank < rank; }
+  else { rRank = Math.min(8, rank+1); beat = false; }
+  if(beat) rv.h2h.l++; else rv.h2h.w++;
+  const rel = beat
+    ? '这次比你快半个身位，拿了<b>第'+rRank+'名</b>。触壁之后看了你一眼，什么也没说。'
+    : '在你身后<b>第'+rRank+'名</b>触壁，爬上来朝你伸出手：「行啊。下次换我领先。」';
+  const head = first
+    ? '看台上有一道视线跟了你一整场——<b>'+rv.name+'</b>，'+rv.city+'的，和你同一个项目。赛后他撞了撞你的肩膀：「游得不错。下次别让我等太久。」<br>'
+    : '⚔ <b>'+rv.name+'</b>（'+rv.city+'）'+rel;
+  let extra = '<br><br>'+head+'<br><span style="font-size:12px;color:var(--ink-soft)">交锋记录：'+rv.h2h.w+' 胜 '+rv.h2h.l+' 负</span>';
+  const F = rv.flags;
+  if(!F.firstWin && rv.h2h.w >= 1){
+    F.firstWin = true;
+    _rvQueue.push({t:'⚔ 第 一 场', b:'赢了'+rv.name+'半个身位。出水的时候他堵在池边，塞给你一瓶水：「行，这个我记下了。」<br><br>要不要回一句？', opts:[
+      {label:'「下次继续」', cb:()=>{ rv.pts = clamp(rv.pts+4,0,100); addLog('你和'+rv.name+'约了下一场。', true); save(); }},
+      {label:'「你也很强」', cb:()=>{ rv.pts = clamp(rv.pts+6,0,100); addLog('你夸了他。他耳朵红了，嘴上还说「那当然」。', true); save(); }}]});
+  }
+  if(!F.firstLose && rv.h2h.l >= 1){
+    F.firstLose = true;
+    _rvQueue.push({t:'⚔ 第 一 败', b:'输给'+rv.name+'的那天晚上，你在更衣室坐了很久。柜门上多了一张字条：「今天是我快。明天不一定。」<br><br>——他半夜溜进来贴的。', opts:[
+      {label:'贴一张回去', cb:()=>{ rv.pts = clamp(rv.pts+5,0,100); addLog('你贴了张字条回去：「明天见。」', true); save(); }},
+      {label:'笑着收好', cb:()=>{ addLog('你把字条折好，收进了柜子最里层。', true); save(); }}]});
+  }
+  if(!F.streak3 && rv.h2h.w >= 3){
+    F.streak3 = true;
+    _rvQueue.push({t:'⚔ 三 连', b:'连续三次压过'+rv.name+'。队友说看见他凌晨在泳池加练，就练你那个转身。<br><br>他不是怕你——他只是不想输给你。', opts:[
+      {label:'约他一起练', cb:()=>{ rv.pts = clamp(rv.pts+6,0,100); S.trained += 15; addLog('你约'+rv.name+'加练了一场，两人都练到馆里关灯（训练量 +15）。', true); save(); }},
+      {label:'让他自己静静', cb:()=>{ addLog('你没去打扰他。有些路，要自己走完才算数。', true); save(); }}]});
+  }
+  save();
+  checkEndings();
+  return extra;
+}
+function rivalYearly(){
+  const rv = S.rival;
+  if(!rv || S.day - rv.born < 360 || S.day - rv.lastYear < 360) return;
+  rv.lastYear = S.day;
+  rv.golds += R(3);
+  queueModal('⚔ 年 度 战 绩 单',
+    '<div class="letterPaper" style="background:linear-gradient(168deg,#eef0f6,#e2e5ef)"><div style="font-family:inherit;font-size:14px;line-height:2;color:var(--ink)">今年的你：🥇'+S.medals.gold+' 枚。<br>今年的我：🥇'+rv.golds+' 枚。<br>咱俩交手：你 '+rv.h2h.w+' 胜，我 '+rv.h2h.l+' 胜。<br><br>数字先放在这儿。水里的东西，明年见。</div><div class="letterSign" style="font-family:inherit">—— '+rv.name+'</div></div>',
+    [{label:'明年见', cb:()=>{}}]);
+}
+const RIVAL_ENDS = {
+  champion:'第一个鼓掌的是我，别回头，我知道。说好的——领奖台下见。',
+  farewell:'说好一起游到四十岁的呢……算了。祝你上岸顺利。',
+  coach:'我把儿子的游泳课报你名下了。别收太贵。',
+  injury:'听到消息那晚我多游了两千米，替你游的。快好起来，我还等着赢你。',
+  cut:'名单上没有你，我练着都没劲。别走远。',
+  retire40:'四十岁，你先上岸。我随后就到。',
+  def:'水里的账还没算完。回头见。'
+};
+/* ===== 粉丝信箱（v13）：手写字来信 ===== */
+const MAIL_POOL = [
+  {who:'小学四年级 · 王小雨', text:'姐姐你好。我在电视上看到你游泳了，你游得像鱼一样。我上周也学会憋气啦，能憋十二秒。妈妈说我游起来像饺子下锅，但是我不怕，我以后也要去比赛。'},
+  {who:'退休教师 · 陈国栋', text:'孩子，我用钢笔给你写这封信。我看了三十年游泳比赛，从穆祥雄看到你。你转身的时候压得很低，很好，这是真功夫。望你保重身体，稳中求进。'},
+  {who:'程序员 · 阿伟', text:'看了你比赛那晚我办了游泳卡。教练说我像一段没有注释的代码，扑腾得很努力但不知道在干嘛。我现在能游十米了。谢谢你。'},
+  {who:'老家泳馆救生员 · 老周', text:'还记得市游泳馆那条五号泳道吗？你现在比赛的泳道，比那条宽多了。我们都看了直播，馆长大叔把你的照片贴在了售票口。回来的时候来馆里坐坐，水还是那个水。'},
+  {who:'高三学生 · 林岸', text:'距离高考还有两百天。我打算每天学不下去的时候就做一组俯卧撑，就当陪你训练。加油，一起上岸——你先上，领奖台那个。'},
+  {who:'邻居阿姨 · 张婶', text:'我是你楼上张婶。我家孙子现在天天在浴缸里练打腿，他妈说他把水全踹出来了。这个得谢谢你。天冷了训练记得穿厚点，秋衣要扎在裤子里。'},
+  {who:'初中同桌 · 大鹏', text:'还记得我不？初中借你抄作业那个。现在我在工地开塔吊，每天中午吃饭刷你的比赛。你拿第一那天，我们整个工棚都在喊。别骄傲，注意腰。'},
+  {who:'粉丝团站长 · 小满', text:'我们「浪花站」今天二十个人啦！虽然不多，但是都很真心。你的比赛时间写在值班表上，谁值班谁负责开电视。随信附上一张手绘的应援卡。'},
+  {who:'夜班护士 · 阿静', text:'下了夜班看你比赛回放，一点困意都没有。第三道那个转身真漂亮。我们科室的人都认识你了。注意休息，别学我们熬夜。'},
+  {who:'游泳班小朋友 · 豆豆', text:'哥哥（姐姐）你好。我的教练说你是我要学习的榜样。我今天学会漂起来了！老师夸了我一颗小星星。等你奥运会拿金牌，我给你看我所有的星星。'},
+  {who:'体育记者 · 老韩', text:'跑了十年游泳线，见过太多昙花一现。但你这半年的曲线不一样——稳，稳得吓人。写这封信没别的意思，就是提前跟你要一句夺冠感言。留着用。'},
+  {who:'一封没有署名的信', text:'致现在的你：还记得八岁那年第一次下水吗？呛了三口水，抓着池边不肯松。后来的每一米，都是你替那时候的自己游的。谢谢你没松手。'}
+];
+function mailDate(d){ return monthOf(d)+'月'+dayOfM(d)+'日'; }
+function letterHtml(l){
+  return '<div class="letterPaper"><div class="letterHand">'+l.text+'</div><div class="letterSign">—— '+l.who+' · '+mailDate(l.day)+'</div></div>';
+}
+function fanMailTick(){
+  if(S.over) return;
+  if(!S.mail) S.mail = {unlocked:false, letters:[], lastDay:0};
+  const m = S.mail;
+  if(!m.unlocked){
+    if(S.meets.some(x=>x.rank<=3 && x.name.indexOf('全国')===0)){
+      m.unlocked = true;
+      addLog('信箱忽然热闹起来——你开始收到陌生人的来信了。', true);
+      toast('📬 信箱开张了');
+    } else return;
+  }
+  if(S.day - (m.lastDay||0) < 15) return;
+  if(Math.random() >= 0.10) return;
+  m.lastDay = S.day;
+  const tpl = pick(MAIL_POOL);
+  const l = {who:tpl.who, text:tpl.text, day:S.day, read:false, replied:false};
+  m.letters.unshift(l);
+  if(m.letters.length > 40) m.letters.length = 40;
+  addLog('📬 收到一封粉丝来信（'+l.who+'）。', true);
+  queueModal('📬 粉 丝 来 信', letterHtml(l), [
+    {label:'回一封', cb:()=>{ l.read = true; l.replied = true; S.diligence = clamp(S.diligence+2,0,100); addLog('给'+l.who+'回了信，写着自己也热血起来（勤奋 +2）。', true); if(Math.random()<0.3){ gainItem(pick(GENERICS)); } save(); render(); }},
+    {label:'收进信箱', cb:()=>{ l.read = true; save(); render(); }}
+  ]);
+  save();
+  checkEndings();
+}
+let _mailPage = 0;
+function mailBadge(){
+  const el = document.querySelector('.tab[data-tab=mail]');
+  if(!el || !S) return;
+  const un = S.mail ? S.mail.letters.filter(x=>!x.read).length : 0;
+  el.innerHTML = '信箱'+(un?' <span style="color:#d65a5a">✉</span>':'');
+}
+function renderMail(){
+  if(!$('mailList')) return;
+  const m = S.mail || {unlocked:false, letters:[]};
+  const per = 6;
+  const list = m.letters;
+  const total = Math.max(1, Math.ceil(list.length/per));
+  if(_mailPage >= total) _mailPage = total-1;
+  if(_mailPage < 0) _mailPage = 0;
+  const seg = list.slice(_mailPage*per, _mailPage*per+per);
+  let html = seg.length ? seg.map((l,k)=>{
+    const i = _mailPage*per+k;
+    return '<div class="mailCard'+(l.read?'':' unread')+'" onclick="openLetter('+i+')"><div style="font-size:20px">✉️</div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700">'+l.who+'</div><div style="font-size:12px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+l.text.slice(0,26)+'…</div></div><div style="font-size:11px;color:var(--ink-soft)">'+mailDate(l.day)+'</div></div>';
+  }).join('') : '<div class="hint">信箱还是空的。在全国赛拿个好名次，信就会来的。</div>';
+  if(total > 1){
+    html += '<div class="logPager">';
+    for(let q=0;q<total;q++) html += '<button class="pgBtn'+(q===_mailPage?' on':'')+'" onclick="goMailPage('+q+')">'+(q+1)+'</button>';
+    html += '</div>';
+  }
+  $('mailList').innerHTML = html;
+  const un = m.letters.filter(x=>!x.read).length;
+  $('mailHint').textContent = m.unlocked ? ('共收到 '+m.letters.length+' 封来信'+(un?' · '+un+' 封未拆':'')+'。回不回、读不读，都是你的事。') : '在全国赛以上的比赛拿到前三，信箱就会开张。';
+  mailBadge();
+}
+function goMailPage(q){ sfx('tap'); _mailPage = q; renderMail(); }
+function openLetter(i){
+  const l = (S.mail && S.mail.letters[i]) || null;
+  if(!l) return;
+  sfx('page');
+  showModal('✉ '+l.who, letterHtml(l), l.replied ? null : [
+    {label:'回一封', cb:()=>{ l.replied = true; S.diligence = clamp(S.diligence+2,0,100); addLog('给'+l.who+'回了信（勤奋 +2）。', true); if(Math.random()<0.3){ gainItem(pick(GENERICS)); } save(); render(); }},
+    {label:'合上信', cb:()=>{}}
+  ]);
+  l.read = true;
+  renderMail();
+}
 function buildMates(){
   const quirks = ['总把救生圈吹得特别鼓','练完必数自己今天的划水次数','爱在池边晾毛巾，摆成一排','给泳池的每条泳道起了名字','能用口哨吹完整首国歌','饭卡里永远多一份糖醋排骨'];
   const out = [], used = [], usedG = [];
@@ -784,6 +963,9 @@ function checkEndings(){
   if(S.rewards.cn && S.rewards.intl) unlockAch('grand');
   if(S.friends.filter(f=>(f.aff||0)>=100).length >= 5) unlockAch('squad');
   if(S.meets.length >= 30) unlockAch('veteran');
+  if(S.rival && (S.rival.h2h.w + S.rival.h2h.l) >= 10) unlockAch('rival');
+  if(S.rival && (S.rival.pts||0) >= 100) unlockAch('bond');
+  if(S.mail && S.mail.letters.length >= 15) unlockAch('mail');
 }
 
 /* ================= 状态 ================= */
@@ -1376,6 +1558,7 @@ function afterAction(kind){
   // 生日与年龄增长（360 天 = 1 岁）
   const na = S.startAge + Math.floor((S.day-1)/360);
   if(na > S.age){ S.age = na; addLog('过了个生日——'+S.age+' 岁了，生日愿望是游得再快一点。', true); }
+  rivalYearly();
   checkEndings();
   careerEndCheck();
   // 40 岁：规则请你上岸
@@ -1410,6 +1593,7 @@ function afterAction(kind){
   if(!S.over && S.relayDay && S.day >= S.relayDay){ S.relayDay = null; offerRelay(); }
   if(S.over){ save(); render(); return; }
   randomEvent();
+  fanMailTick();
   scheduleTrial();
   offerTrial();
   scheduleMeet();
@@ -1739,12 +1923,14 @@ function runMeetResult(tier, city, hits, fan){
   else if(Math.random() < 0.22) gainItem(pick(GENERICS));
   // 老朋友寄明信片
   palPostcard();
+  const rvExtra = rivalHook(tier.name, city, rank, false);
   let extra = '';
   // 级别越高，认识的人越多
   const meetChances = S.trialIdx>=3 ? [0.65,0.5,0.4] : (S.trialIdx>=2 ? [0.65,0.45] : [0.65]);
   meetChances.forEach(ch=>{ if(Math.random() < ch){ const e = makeFriend(city); if(e) extra += e; } });
   const bonusTxt = '<span style="font-size:12px;color:var(--ink-soft)">（划水节奏 '+hits+'/8，发挥'+(bonus>=0?'+':'')+bonus+'）</span>';
-  showModal(tier.name+' · 100米'+(strokeName()||'混合'), city+'的泳池，八条泳道。<br><br>'+bonusTxt+'<br><br>'+S.name+'拿到了<b>'+rankTxt+'</b>'+(medalTxt?'，'+medalTxt:'')+'。'+(rank===1?mateNote(WIN_NOTES):'')+fanLine(fan, rank)+extra);
+  showModal(tier.name+' · 100米'+(strokeName()||'混合'), city+'的泳池，八条泳道。<br><br>'+bonusTxt+'<br><br>'+S.name+'拿到了<b>'+rankTxt+'</b>'+(medalTxt?'，'+medalTxt:'')+'。'+(rank===1?mateNote(WIN_NOTES):'')+fanLine(fan, rank)+extra+rvExtra);
+  drainRival();
   checkEndings();
   scheduleTrialIfNeeded();
   if(S.trialIdx >= 1){
@@ -1815,7 +2001,7 @@ function forceEnd(id, extraLine){
   const src = useFile ? e.img : drawEndArt(id);
   const errAttr = useFile ? (e.draw ? ' onerror="this.onerror=null;this.src=drawEndArt(\''+id+'\')"' : ' onerror="pcImgFail(this)"') : '';
   _mq.push({t:'结 局 · '+e.t,
-    b:'<img class="pcImg pixImg" src="'+src+'"'+errAttr+'><div class="pcCap">'+e.t+'</div>'+(extraLine?extraLine+'<br><br>':'')+e.b.replace(/\{name\}/g, S.name)+(S.mates&&S.mates.length?'<br><br><span style="font-size:12px;color:var(--ink-soft)">柜门上的最后一张便签 · '+pick(S.mates).name+'：「'+pick(FAREWELL_NOTES)+'」</span>':'')});
+    b:'<img class="pcImg pixImg" src="'+src+'"'+errAttr+'><div class="pcCap">'+e.t+'</div>'+(extraLine?extraLine+'<br><br>':'')+e.b.replace(/\{name\}/g, S.name)+(S.mates&&S.mates.length?'<br><br><span style="font-size:12px;color:var(--ink-soft)">柜门上的最后一张便签 · '+pick(S.mates).name+'：「'+pick(FAREWELL_NOTES)+'」</span>':'')+(S.rival?'<br><br><span style="font-size:12px;color:var(--ink-soft)">⚔ 宿敌 · '+S.rival.name+'：「'+(RIVAL_ENDS[id]||RIVAL_ENDS.def)+'」</span>':'')});
   _mq.push({t:'手 账 之 后',
     b:'泳池生涯 · '+Math.ceil(S.day/30)+' 个月<br>累计训练量 '+S.trained+'<br>奖牌 🥇'+m.gold+' 🥈'+m.silver+' 🥉'+m.bronze+'<br>朋友 '+S.friends.length+' 人<br>成就 '+ACH.filter(a=>S.ach&&S.ach[a.id]).length+' / '+ACH.length+'<br><br>'+(id==='injury'?'不是不想游，是身体先说了再见。':(id==='farewell'?'那片水，会记得TA来过。':(id==='champion'?'掌声落下，TA把最好的年纪留给了泳池。':'手账合上了，泳池记得每一个认真游过的人。'))),
     btns:[{label:'重新翻开一本手账', cb:resetGame}]});
@@ -2025,6 +2211,7 @@ function endPlane(){
   else if(rank===2){ S.medals.silver++; medalTxt='🥈 银牌'; }
   else if(rank===3){ S.medals.bronze++; medalTxt='🥉 铜牌'; }
   S.meets.push({day:S.day, city:m.city, name:m.name+'（七日）', rank});
+  const rvExtra = rivalHook(m.name+'（七日）', m.city, rank, m.intl);
   addLog(m.name+'（'+m.city+'）七日赛程结束：单项 '+m.ranks.map(r=>'第'+r).join(' / ')+'，'+rankTxt+(medalTxt?'，'+medalTxt:'，与奖牌擦肩')+'，带走 3 张大赛证书。', true);
   if(Math.random() < (m.intl?0.40:0.30)) gainItem('card', m.city, m.country);
   else if(Math.random() < 0.25) gainItem(pick(GENERICS));
@@ -2039,8 +2226,9 @@ function endPlane(){
   render();
   const det = m.ranks.map((r,i)=>'第'+(i+1)+'个决赛日：第'+r+'名').join('<br>');
   queueModal('总 排 名 · '+m.name,
-    '七天——泳池、酒店、街道和看台，到这里收卷。<br><br>'+det+'<br><br><b>'+S.name+'</b>——'+rankTxt+(medalTxt?'，'+medalTxt:'')+'。<br>三天单项的证书都在手上了。'+(rank<=3?'<br><span style="font-size:12px;color:var(--ink-soft)">这枚奖牌，会挂进房间墙的奖牌轨。</span>':'')+(rank===1?mateNote(WIN_NOTES):''),
+    '七天——泳池、酒店、街道和看台，到这里收卷。<br><br>'+det+'<br><br><b>'+S.name+'</b>——'+rankTxt+(medalTxt?'，'+medalTxt:'')+'。<br>三天单项的证书都在手上了。'+(rank<=3?'<br><span style="font-size:12px;color:var(--ink-soft)">这枚奖牌，会挂进房间墙的奖牌轨。</span>':'')+(rank===1?mateNote(WIN_NOTES):'')+rvExtra,
     [{label:'收拾行李回训练馆', cb:()=>{ if(wasOly && rank===1){ forceEnd('champion'); } }}]);
+  drainRival();
 }
 function planeQuit(){
   const m = S.meet7; if(!m) return;
@@ -2168,10 +2356,12 @@ function runIntMeetResult(meet, city, country, rivals, hits, fan){
   palPostcard();
   checkEndings();
 
+  const rvExtra = rivalHook(meet, city, rank, true);
   let extra = '';
   [0.8, 0.6, 0.4].forEach(ch=>{ if(Math.random() < ch){ const e = makeFriend(city, true); if(e) extra += e; } });
   const bonusTxt = '<span style="font-size:12px;color:var(--ink-soft)">（划水节奏 '+hits+'/8，发挥'+(bonus>=0?'+':'')+bonus+'）</span>';
-  showModal(meet+' · 100米'+(strokeName()||'混合'), city+'的水深比家里深。<br><br>'+bonusTxt+'<br><br>'+S.name+'拿到了<b>'+rankTxt+'</b>'+(medalTxt?'，'+medalTxt:'')+'。'+(rank===1?mateNote(WIN_NOTES):'')+fanLine(fan, rank)+extra);
+  showModal(meet+' · 100米'+(strokeName()||'混合'), city+'的水深比家里深。<br><br>'+bonusTxt+'<br><br>'+S.name+'拿到了<b>'+rankTxt+'</b>'+(medalTxt?'，'+medalTxt:'')+'。'+(rank===1?mateNote(WIN_NOTES):'')+fanLine(fan, rank)+extra+rvExtra);
+  drainRival();
   if(meet==='奥运会' && rank===1){ forceEnd('champion'); }
   S.intCount = 0;
   save();
@@ -2640,6 +2830,8 @@ function load(){
     if(!S.tapeUntil) S.tapeUntil=0;
     if(!S.roster) S.roster = buildRoster();
     if(!S.nameVer){ S.nameVer = 1; const _un = []; (S.roster||[]).forEach((p,i)=>{ if((S.metIdx||[]).indexOf(i)<0) p.n = rosterName(p,_un); }); }
+    if(!S.mail) S.mail = {unlocked:false, letters:[], lastDay:0};
+    if(S.rival === undefined) S.rival = null;
     if(!S.metIdx) S.metIdx=[];
     if(!S.endings) S.endings={};
     if(S.friends) S.friends.forEach(f=>{ if(!f.fav) f.fav = SOUVENIRS.slice().sort(()=>Math.random()-0.5).slice(0,2).map(s=>s.id); if(!f.stage) f.stage=0; });
@@ -2697,6 +2889,7 @@ function render(){
   drawRoom();
   renderRoom();
 
+  renderMail();
   renderFriends();
   $('friendHint').textContent = S.friends.length ? ('已结识 '+S.metIdx.length+'/'+S.roster.length+' 人 · 好友们让训练效果 +'+(Math.round(Math.min(S.friends.length,10)*(has('sj')?0.3:0.2)*100)/10)+'% · 今天还能聊 '+(chatLimit()-(S.chats||0))+' 次') : '还没有朋友。去大城市比赛，会认识别的地区的人。';
   $('friendHint').title = '好感 50/80/100 会开启关系进阶：老朋友寄明信片 → 知己（聊天上限+1、送礼+4） → 并肩的人（训练加成翻倍）';
@@ -3236,13 +3429,19 @@ function showHelp(){
     ])) +
     H('🏁 结局与成就', L([
       '结局共有 6 个，全部会结束生涯：奥运夺冠 / 告别泳池 / 伤病退役 / 队内淘汰 / 40 岁退役 / 转行教练',
-      '成就不结束生涯，共 7 项：32 岁仍在坚持 / 累计 15 金 / 连胜 10 场 / 图鉴全收集 / 5 位好友满好感 / 结识所有人 / 累计 30 场比赛',
+      '成就不结束生涯，共 10 项：32 岁仍在坚持 / 累计 15 金 / 连胜 10 场 / 图鉴全收集 / 5 位好友满好感 / 结识所有人 / 累计 30 场比赛 / 亦敌亦友 / 惺惺相惜 / 纸短情长',
       '成就进度在收藏栏「🏆 成就」页随时可查；合上的手账在首页「回看手账」里'
     ])) +
     H('🍂 四季与队友', L([
       '游戏里 360 天一年、90 天一季：春稳、夏旺（杂事多）、秋爽（疲惫散得快）、冬苦（收益 +15%，疲惫 +15%）',
       '属性栏常驻季节便签，房间墙的窗户会跟着换景',
       '队里有三位队友，换季、夺冠、考核警告、生涯结束时，他们会给你留言签'
+    ])) +
+    H('⚔ 宿敌与信箱', L([
+      '第一次游进省级以上的比赛，看台上会有个人记住你——从此大赛他都到场，交锋记录写进赛后总结',
+      '宿敌的实力跟着你长：甩不掉，也躲不开。交手 10 场、交情处满，各有一枚成就',
+      '每年年底他会寄来一张年度战绩单——数字先放着，水里见',
+      '全国赛拿过前三，信箱开张：粉丝来信是手写的字，拆开能读能回，收藏栏随时翻看'
     ])) +
     H('🏨 大赛周 · 七日位面', L([
       '省锦标赛及以上、全部国际赛走七日赛程，不占训练天数',
