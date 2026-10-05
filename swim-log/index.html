@@ -343,6 +343,7 @@
       <div id="attrBars"></div>
       <div id="sickBadge"></div>
       <div id="strokeNote"></div>
+      <div id="seasonNote"></div>
       <div id="assessNote"></div>
     </div>
 
@@ -470,6 +471,17 @@ const ACH = [
   {id:'brothers',t:'四海皆兄弟',   hint:'结识所有人物（国内每城 5 人 · 国际每国 10 人）'},
   {id:'veteran', t:'常青树',       hint:'累计参加 30 场比赛'}
 ];
+function buildMates(){
+  const quirks = ['总把救生圈吹得特别鼓','练完必数自己今天的划水次数','爱在池边晾毛巾，摆成一排','给泳池的每条泳道起了名字','能用口哨吹完整首国歌','饭卡里永远多一份糖醋排骨'];
+  const out = [], used = [];
+  for(let i=0;i<3;i++){
+    let nm, guard=0;
+    do{ nm = pick(SURNAMES) + pick(GIVEN); guard++; }while(used.indexOf(nm)>-1 && guard<20);
+    used.push(nm);
+    out.push({name:nm, quirk:quirks[(i*2+R(3))%quirks.length]});
+  }
+  return out;
+}
 function unlockAch(id){
   S.ach = S.ach || {};
   if(S.ach[id]) return;
@@ -804,6 +816,7 @@ function newGame(name, age, gender){
     dex:{cn:{}, intl:{}}, rewards:{}, buffDay:0, globalMult:1, restStreak:0, startAge: clamp(age,8,40),
     gear:{}, suitBuff:false, gelBuff:false, tapeUntil:0, sponsorAsked:false, meetDistract:false,
     roster: buildRoster(), metIdx:[], endings:{},
+    mates: buildMates(), lastSeason: 0,
     stroke:null, strokeRefusedId:null, wall:{card:{}, shelf:{}}, relayDay:null,
     hairstyle:_look.hair, suitColor:_look.suit, skinColor:_look.skin
   };
@@ -908,7 +921,7 @@ function sickChance(){
   if(has('mg')) c *= 1.4;
   if(has('tr')) c *= 0.7;
   if(has('sx')) c *= 0.8;
-  return clamp(c, 0.005, 0.3);
+  return clamp(c * season().sick, 0.005, 0.3);
 }
 function friendChance(){
   let c = 0.65;
@@ -923,7 +936,7 @@ function finishMain(mult){
     laneSwim();
     S.restStreak = 0;
     const dip = restDip();
-    let gain = (10 + S.diligence*0.10 + R(6)) * mult * fatigueMult() * growthMult() * ageStage().gain * dip;
+    let gain = (10 + S.diligence*0.10 + R(6)) * mult * fatigueMult() * growthMult() * ageStage().gain * dip * season().gain;
     if(S.buffDay===S.day) gain *= 1.5;
     let gelNote = '';
     if(S.coachUntil && S.day <= S.coachUntil) gain *= 1.2; // 好友陪练：聊天独有
@@ -935,7 +948,7 @@ function finishMain(mult){
     const capped = gain > cap;
     gain = Math.min(gain, cap);
     S.trained += gain;
-    S.fatigue = clamp(S.fatigue + Math.round(16 - S.diligence*0.05 + R(6)), 0, 100);
+    S.fatigue = clamp(S.fatigue + Math.round((16 - S.diligence*0.05 + R(6)) * season().fat), 0, 100);
     S.tech = Math.min(100, S.tech + 0.3);
     addLog('主课训练'+(S.sick?'（带病上场）':'')+(cramp?'，中途小腿抽筋，量打了折':'')+gelNote+(dip<1?'（歇太久了，状态有点下滑）':'')+'，训练量 +'+gain+'。'+(capped?'（天赋所限，今天再练也吞不下更多了）':'')+fatigueNote());
 }
@@ -1295,6 +1308,10 @@ function afterAction(kind){
 
   S.day += TICK;
   S.chats = 0;
+  // 换季：90 天一季
+  const ns = seasonOf(S.day);
+  if(S.lastSeason === undefined) S.lastSeason = ns;
+  if(ns !== S.lastSeason){ S.lastSeason = ns; seasonTurn(); }
   // 生日与年龄增长（360 天 = 1 岁）
   const na = S.startAge + Math.floor((S.day-1)/360);
   if(na > S.age){ S.age = na; addLog('过了个生日——'+S.age+' 岁了，生日愿望是游得再快一点。', true); }
@@ -1342,6 +1359,12 @@ function renderStrokeNote(){
     ? '🏊 主项 · <b>'+strokeName()+'</b> —— '+STROKES.find(x=>x.id===S.stroke).desc
     : '<span style="opacity:.75">🏊 主项未定 —— 练满一年，教练会来找你谈话</span>';
 }
+function renderSeasonNote(){
+  if(!S || S.over){ return; }
+  const se = season();
+  const pct = v => (v===1 ? '' : (v>1 ? ' +' : ' ') + Math.round((v-1)*100) + '%');
+  $('seasonNote').innerHTML = se.icon+' <b>'+se.note+'</b><span style="color:var(--ink-soft);font-size:12px">（收益'+pct(se.gain)+' · 疲惫'+pct(se.fat)+'）</span>';
+}
 function renderAssessNote(){
   if(!S || S.over){ return; }
   if(!S.assess){ $('assessNote').textContent = ''; return; }
@@ -1374,6 +1397,7 @@ function runAssessment(){
       addLog('队内考核未达标：训练量 '+got+'/'+need+'。', true);
       queueModal('队 内 考 核',
         '教练把考核表折起来，敲了敲你的柜门：<br><br>「这个周期训练量 <b>'+got+'</b>，标准是 <b>'+need+'</b>。」<br><br>「队里不养闲人——<b>连着两个周期不达标，或者累计五个</b>，你就得把柜子腾出来了。」<br><br><span style="font-size:12px;color:var(--ink-soft)">200 天后重新考核 · 连续未达标 '+S.assess.streak+'/2 · 累计未达标 '+S.assess.fails+'/5</span>');
+      if(S.mates && S.mates.length) queueModal('更 衣 室 便 签', '<div style="font-size:13px;color:var(--ink-soft)">'+pick(S.mates).name+' 贴在你柜门上的：</div><br><br>「'+pick(WARN_NOTES)+'」');
     }
   }
   save();
@@ -1404,10 +1428,41 @@ const EVENTS = [
   '阳台上的多肉长出新叶子了，比想象中顽强。',
   '梦见自己压水压得太深，醒来发现腿真的在动。'
 ];
+/* ================= 四季（360 天一年，每季 90 天） ================= */
+const SEASONS = [
+  {name:'春', icon:'🌸', note:'春训 · 水刚刚回暖，一切都稳稳的',   gain:1.00, fat:1.00, sick:1.00, evt:1.00},
+  {name:'夏', icon:'☀️', note:'夏训 · 状态正旺，只是杂事也多',     gain:1.05, fat:1.00, sick:0.90, evt:1.50},
+  {name:'秋', icon:'🍂', note:'秋训 · 秋高气爽，疲惫散得快',       gain:1.00, fat:0.90, sick:1.00, evt:1.00},
+  {name:'冬', icon:'❄️', note:'冬训 · 水凉得咬人，但涨得也快',     gain:1.15, fat:1.15, sick:1.30, evt:0.80}
+];
+function seasonOf(day){ return Math.floor(((day-1)%360)/90); }
+function season(){ return SEASONS[seasonOf(S.day)]; }
+function seasonTurn(){
+  const se = season();
+  addLog('换季了——'+se.note+'。', true);
+  if(S.mates && S.mates.length && Math.random() < 0.7){
+    const mt = pick(S.mates);
+    addLog('便签 · '+mt.name+'：'+pick(SEASON_NOTES[se.name]), true);
+  }
+}
+const SEASON_NOTES = {
+  '春': ['开春的水还带着凉意，不过你先跳下去的样子像条鱼。','泳池边那棵树开花了，训练完去看一眼，就一眼。'],
+  '夏': ['夏天来喽——晚训完请你吃冰，说好了。','天热，水汽都是甜的。今天你状态好得很。'],
+  '秋': ['落叶飘进泳道了，捞了半天。秋天练技术正合适。','早晚温差大，别图凉快不穿外套。'],
+  '冬': ['冬训第一天，我的手都冻红了。一起涨得快一点。','水凉得咬人，但教练说，春天见分晓。']
+};
+const WIN_NOTES = ['看到没！我就说你可以！','今晚加餐，我请——别问为什么，开心。','你站上去那一刻，水花都是金色的。'];
+const WARN_NOTES = ['考核而已，练回去就是。我陪你加练。','别听教练凶，他昨晚还跟别人夸你来着。','柜子先留着，我帮你擦干净了。'];
+const FAREWELL_NOTES = ['泳池会记得你的。我也会。','以后谁替我压浪花啊……常回来看看。','你教我的第一件事我还记得。谢谢你来的第一天。'];
+function mateNote(pool){
+  if(!S.mates || !S.mates.length) return '';
+  return '<br><br><span style="font-size:12px;color:var(--ink-soft)">便签 · '+pick(S.mates).name+'：「'+pick(pool)+'」</span>';
+}
 function randomEvent(){
+  const ev = season().evt;
   if(Math.random()<0.04){ offerSupplement(); return; }
-  if(Math.random()<0.07){ offerSpecialEvent(); return; }
-  if(Math.random()<0.08) addLog(pick(EVENTS), true);
+  if(Math.random()<0.07*ev){ offerSpecialEvent(); return; }
+  if(Math.random()<0.08*ev) addLog(pick(EVENTS), true);
 }
 /* 突发事件：带选择的特殊事件 */
 const SPECIAL_EVENTS = [
@@ -1601,7 +1656,7 @@ function runMeetResult(tier, city, hits, fan){
   const meetChances = S.trialIdx>=3 ? [0.65,0.5,0.4] : (S.trialIdx>=2 ? [0.65,0.45] : [0.65]);
   meetChances.forEach(ch=>{ if(Math.random() < ch){ const e = makeFriend(city); if(e) extra += e; } });
   const bonusTxt = '<span style="font-size:12px;color:var(--ink-soft)">（划水节奏 '+hits+'/8，发挥'+(bonus>=0?'+':'')+bonus+'）</span>';
-  showModal(tier.name+' · 100米'+(strokeName()||'混合'), city+'的泳池，八条泳道。<br><br>'+bonusTxt+'<br><br>'+S.name+'拿到了<b>'+rankTxt+'</b>'+(medalTxt?'，'+medalTxt:'')+'。'+fanLine(fan, rank)+extra);
+  showModal(tier.name+' · 100米'+(strokeName()||'混合'), city+'的泳池，八条泳道。<br><br>'+bonusTxt+'<br><br>'+S.name+'拿到了<b>'+rankTxt+'</b>'+(medalTxt?'，'+medalTxt:'')+'。'+(rank===1?mateNote(WIN_NOTES):'')+fanLine(fan, rank)+extra);
   checkEndings();
   scheduleTrialIfNeeded();
   if(S.trialIdx >= 1){
@@ -1672,7 +1727,7 @@ function forceEnd(id, extraLine){
   const src = useFile ? e.img : drawEndArt(id);
   const errAttr = useFile ? (e.draw ? ' onerror="this.onerror=null;this.src=drawEndArt(\''+id+'\')"' : ' onerror="pcImgFail(this)"') : '';
   _mq.push({t:'结 局 · '+e.t,
-    b:'<img class="pcImg pixImg" src="'+src+'"'+errAttr+'><div class="pcCap">'+e.t+'</div>'+(extraLine?extraLine+'<br><br>':'')+e.b.replace(/\{name\}/g, S.name)});
+    b:'<img class="pcImg pixImg" src="'+src+'"'+errAttr+'><div class="pcCap">'+e.t+'</div>'+(extraLine?extraLine+'<br><br>':'')+e.b.replace(/\{name\}/g, S.name)+(S.mates&&S.mates.length?'<br><br><span style="font-size:12px;color:var(--ink-soft)">柜门上的最后一张便签 · '+pick(S.mates).name+'：「'+pick(FAREWELL_NOTES)+'」</span>':'')});
   _mq.push({t:'手 账 之 后',
     b:'泳池生涯 · '+Math.ceil(S.day/30)+' 个月<br>累计训练量 '+S.trained+'<br>奖牌 🥇'+m.gold+' 🥈'+m.silver+' 🥉'+m.bronze+'<br>朋友 '+S.friends.length+' 人<br>成就 '+ACH.filter(a=>S.ach&&S.ach[a.id]).length+' / '+ACH.length+'<br><br>'+(id==='injury'?'不是不想游，是身体先说了再见。':(id==='farewell'?'那片水，会记得TA来过。':(id==='champion'?'掌声落下，TA把最好的年纪留给了泳池。':'手账合上了，泳池记得每一个认真游过的人。'))),
     btns:[{label:'重新翻开一本手账', cb:resetGame}]});
@@ -1896,7 +1951,7 @@ function endPlane(){
   render();
   const det = m.ranks.map((r,i)=>'第'+(i+1)+'个决赛日：第'+r+'名').join('<br>');
   queueModal('总 排 名 · '+m.name,
-    '七天——泳池、酒店、街道和看台，到这里收卷。<br><br>'+det+'<br><br><b>'+S.name+'</b>——'+rankTxt+(medalTxt?'，'+medalTxt:'')+'。<br>三天单项的证书都在手上了。'+(rank<=3?'<br><span style="font-size:12px;color:var(--ink-soft)">这枚奖牌，会挂进房间墙的奖牌轨。</span>':''),
+    '七天——泳池、酒店、街道和看台，到这里收卷。<br><br>'+det+'<br><br><b>'+S.name+'</b>——'+rankTxt+(medalTxt?'，'+medalTxt:'')+'。<br>三天单项的证书都在手上了。'+(rank<=3?'<br><span style="font-size:12px;color:var(--ink-soft)">这枚奖牌，会挂进房间墙的奖牌轨。</span>':'')+(rank===1?mateNote(WIN_NOTES):''),
     [{label:'收拾行李回训练馆', cb:()=>{ if(wasOly && rank===1){ forceEnd('champion'); } }}]);
 }
 function planeQuit(){
@@ -2028,7 +2083,7 @@ function runIntMeetResult(meet, city, country, rivals, hits, fan){
   let extra = '';
   [0.8, 0.6, 0.4].forEach(ch=>{ if(Math.random() < ch){ const e = makeFriend(city, true); if(e) extra += e; } });
   const bonusTxt = '<span style="font-size:12px;color:var(--ink-soft)">（划水节奏 '+hits+'/8，发挥'+(bonus>=0?'+':'')+bonus+'）</span>';
-  showModal(meet+' · 100米'+(strokeName()||'混合'), city+'的水深比家里深。<br><br>'+bonusTxt+'<br><br>'+S.name+'拿到了<b>'+rankTxt+'</b>'+(medalTxt?'，'+medalTxt:'')+'。'+fanLine(fan, rank)+extra);
+  showModal(meet+' · 100米'+(strokeName()||'混合'), city+'的水深比家里深。<br><br>'+bonusTxt+'<br><br>'+S.name+'拿到了<b>'+rankTxt+'</b>'+(medalTxt?'，'+medalTxt:'')+'。'+(rank===1?mateNote(WIN_NOTES):'')+fanLine(fan, rank)+extra);
   if(meet==='奥运会' && rank===1){ forceEnd('champion'); }
   S.intCount = 0;
   save();
@@ -2488,6 +2543,8 @@ function load(){
     // 力量/技巧硬上限 100：把历史存档里溢出的部分压回去
     S.tech = Math.min(100, Math.max(0, S.tech));
     S.strength = Math.min(100, Math.max(0, S.strength));
+    if(!S.mates || !S.mates.length) S.mates = buildMates();
+    if(S.lastSeason === undefined) S.lastSeason = seasonOf(S.day);
     if(!S.globalMult) S.globalMult=1;
     if(!S.restStreak) S.restStreak=0;
     if(!S.startAge) S.startAge = S.age;
@@ -2546,6 +2603,7 @@ function render(){
   renderLog();
   renderAch();
   renderAssessNote();
+  renderSeasonNote();
   renderStrokeNote();
   drawRoom();
   renderRoom();
@@ -2878,10 +2936,31 @@ function drawRoom(){
   grad.addColorStop(0,'#9d92b2'); grad.addColorStop(1,'#b3a8c4');
   g.fillStyle = grad; g.fillRect(0,0,480,268);
   P(0,268,480,10,'#6d637f'); P(0,278,480,22,'#4a4158');
-  // 窗（夜空+月亮，呼应泳池夜色）
-  P(368,36,84,96,'#3a3550'); P(372,40,76,88,'#1d3a52'); P(374,42,72,84,'#16324a');
-  g.fillStyle='#f2e8c8'; g.beginPath(); g.arc(424,66,12,0,7); g.fill();
+  // 窗（夜空随季节换景，呼应泳池夜色）
+  const WSE = [
+    {sky:'#22405a', moon:'#f2e8c8', extra:'petal'},
+    {sky:'#16324a', moon:'#f2e8c8', extra:'firefly'},
+    {sky:'#2b2440', moon:'#e8b06a', extra:'leaf'},
+    {sky:'#1a2a44', moon:'#dfe6f2', extra:'snow'}
+  ];
+  const wse = WSE[seasonOf(S.day)];
+  P(368,36,84,96,'#3a3550'); P(372,40,76,88,'#1d3a52'); P(374,42,72,84,wse.sky);
+  g.fillStyle=wse.moon; g.beginPath(); g.arc(424,66,12,0,7); g.fill();
   P(374,60,72,2,'rgba(255,255,255,.15)'); P(374,84,72,2,'rgba(255,255,255,.12)'); P(374,108,72,2,'rgba(255,255,255,.10)');
+  if(wse.extra==='petal'){
+    g.fillStyle='rgba(236,170,196,.85)';
+    [[382,52],[400,72],[416,96],[388,112],[432,50]].forEach(pt=>{ g.fillRect(pt[0],pt[1],3,2); g.fillRect(pt[0]+1,pt[1]-2,2,2); });
+  }else if(wse.extra==='firefly'){
+    g.fillStyle='rgba(255,236,150,.9)';
+    [[384,56],[406,74],[428,98],[392,114]].forEach(pt=>{ g.fillRect(pt[0],pt[1],2,2); });
+  }else if(wse.extra==='leaf'){
+    g.fillStyle='rgba(216,138,74,.9)';
+    [[380,58],[398,76],[420,92],[434,112]].forEach(pt=>{ g.fillRect(pt[0],pt[1],4,2); g.fillRect(pt[0]+1,pt[1]+2,2,2); });
+  }else{
+    g.fillStyle='rgba(240,244,252,.9)';
+    [[382,50],[396,64],[414,58],[430,74],[388,90],[408,100],[424,112],[380,118]].forEach(pt=>{ g.fillRect(pt[0],pt[1],2,2); });
+    P(374,122,72,4,'rgba(232,236,242,.95)');
+  }
   P(406,40,4,88,'#3a3550'); P(372,80,76,4,'#3a3550');
   // 串灯
   const LC = ['#ffe28a','#a8e6cf','#e8a0c0','#aee5f2'];
@@ -3062,6 +3141,11 @@ function showHelp(){
       '结局只有 5 个，全部会结束生涯：奥运夺冠 / 转行 / 伤病退役 / 队内淘汰 / 40 岁退役',
       '成就不结束生涯，共 7 项：32 岁仍在坚持 / 累计 15 金 / 连胜 10 场 / 图鉴全收集 / 5 位好友满好感 / 结识所有人 / 累计 30 场比赛',
       '成就进度在收藏栏「🏆 成就」页随时可查；合上的手账在首页「回看手账」里'
+    ])) +
+    H('🍂 四季与队友', L([
+      '游戏里 360 天一年、90 天一季：春稳、夏旺（杂事多）、秋爽（疲惫散得快）、冬苦（收益 +15%，疲惫 +15%）',
+      '属性栏常驻季节便签，房间墙的窗户会跟着换景',
+      '队里有三位队友，换季、夺冠、考核警告、生涯结束时，他们会给你留言签'
     ])) +
     H('🏨 大赛周 · 七日位面', L([
       '省锦标赛及以上、全部国际赛走七日赛程，不占训练天数',
