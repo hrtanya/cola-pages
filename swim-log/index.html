@@ -498,7 +498,7 @@ const ACH = [
 ];
 /* ===== 宿敌线（v13） ===== */
 let _rvQueue = [];
-function drainRival(){ while(_rvQueue.length){ const q = _rvQueue.shift(); queueModal(q.t, q.b, q.opts); } }
+function drainRival(){ while(_rvQueue.length){ const q = _rvQueue.shift(); setTimeout(()=>queueModal(q.t, q.b, q.opts), 0); } }
 function rivalNew(city){
   if(S.rival) return;
   const pool = S.roster.filter(q=>q.r===city);
