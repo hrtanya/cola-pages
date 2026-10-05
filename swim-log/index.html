@@ -231,6 +231,10 @@
   }
   /* 从设置里打开的玩法说明：要盖在设置弹窗上层 */
   #modal.above{z-index:58;}
+  /* 房间文字：HTML 标签层，替换画布小字 */
+  #roomLabels{position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;overflow:hidden;}
+  .rlab{position:absolute;transform:translate(-50%,-50%);font-size:12px;color:#fff;white-space:nowrap;text-shadow:0 1px 2px rgba(30,25,45,.4);line-height:1;}
+  .rlabL{transform:translate(0,-50%);color:rgba(255,255,255,.9);}
   #modal.on{display:flex;}
   #setModal{
     position:fixed;inset:0;display:none;align-items:center;justify-content:center;
@@ -379,7 +383,10 @@
     </div>
     <div class="panel" id="panel-ach"><div id="achList"></div></div>
     <div class="panel" id="panel-dex">
-      <canvas id="roomWall" width="480" height="300" style="width:100%;max-width:480px;border-radius:10px;display:block;margin:0 auto;cursor:pointer;" onclick="roomClick(event)"></canvas>
+      <div id="roomWrap" style="position:relative;max-width:480px;margin:0 auto;">
+        <canvas id="roomWall" width="480" height="300" style="width:100%;border-radius:10px;display:block;cursor:pointer;" onclick="roomClick(event)"></canvas>
+        <div id="roomLabels"></div>
+      </div>
       <div id="roomBtns" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px;"></div>
       <div class="hint" id="roomHint"></div>
     </div>
@@ -460,7 +467,9 @@ const ENDINGS = [
   {id:'cut', t:'名单上没有我', draw:true, hint:'连续 2 个或累计 5 个考核周期不达标，被筛出队伍',
    b:'公告栏的名单换了一茬又一茬，这一次，上面没有<b>{name}</b>。<br><br>收拾柜子的那天，队友们都没怎么说话。<br><br>泳池还在，只是从此换一种方式路过它。'},
   {id:'retire40', t:'四十岁的浪', draw:true, hint:'游到 40 岁，时间到了',
-   b:'规则写着：40 岁，该上岸了。<br><br><b>{name}</b>把泳镜挂上池边的钩子，摆正，又摸了一下。<br><br>「下一辈子，还游。」'}
+   b:'规则写着：40 岁，该上岸了。<br><br><b>{name}</b>把泳镜挂上池边的钩子，摆正，又摸了一下。<br><br>「下一辈子，还游。」'},
+  {id:'coach', t:'希望你们比我更好', draw:true, hint:'35 岁天赋不足 60，选择接过教鞭',
+   b:'<b>{name}</b>把泳镜挂在了教练办公室的门后。<br><br>清晨的泳池还是那个泳池，只是岸边多了一排晃晃悠悠、怕水又兴奋的小孩。<br><br>「希望你们比我更好。」'}
 ];
 const ACH = [
   {id:'home',    t:'泳池已是故乡', hint:'游到 32 岁，仍在坚持'},
@@ -473,10 +482,15 @@ const ACH = [
 ];
 function buildMates(){
   const quirks = ['总把救生圈吹得特别鼓','练完必数自己今天的划水次数','爱在池边晾毛巾，摆成一排','给泳池的每条泳道起了名字','能用口哨吹完整首国歌','饭卡里永远多一份糖醋排骨'];
-  const out = [], used = [];
+  const out = [], used = [], usedG = [];
   for(let i=0;i<3;i++){
-    let nm, guard=0;
-    do{ nm = pick(SURNAMES) + pick(GIVEN); guard++; }while(used.indexOf(nm)>-1 && guard<20);
+    let nm, g, guard=0;
+    do{
+      g = pick(GIVEN);
+      nm = pick(SURNAMES) + g;
+      guard++;
+    }while((used.indexOf(nm)>-1 || usedG.indexOf(g)>-1) && guard<20);
+    usedG.push(g);
     used.push(nm);
     out.push({name:nm, quirk:quirks[(i*2+R(3))%quirks.length]});
   }
@@ -500,9 +514,45 @@ function renderAch(){
       return '<div class="meetItem" style="text-align:left;'+(got?'':'opacity:.5;')+'">'+(got?'🏆':'✧')+' <b>'+a.t+'</b>'+(got?'':'<br><span style="font-size:12px;color:var(--ink-soft)">'+a.hint+'</span>')+'</div>';
     }).join('');
 }
-const SURNAMES = ['林','陈','周','沈','顾','韩','杨','许','秦','姜','薛','方','程','叶','苏','魏','江','赵'];
-const GIVEN = ['屿','聿','知遥','晚舟','斯年','与安','照野','叙白','南絮','亦航','清晏','闻笛','舒扬','之涣','沐晴','望舒','北辰','海蓝','星回','可蓝'];
+const SURNAMES = ['林','陈','周','沈','顾','韩','杨','许','秦','姜','薛','方','程','叶','苏','魏','江','赵','陆','宋','唐','孟','崔','杜','傅','范','石','马','罗','冯','任','蒋','卢','丁','贺','倪'];
+const GIVEN = ['屿','聿','知遥','晚舟','斯年','与安','照野','叙白','南絮','亦航','清晏','闻笛','舒扬','之涣','沐晴','望舒','北辰','海蓝','星回','可蓝','观澜','枕浪','踏歌','衔山','泠然','既白','竹西','疏影','青梧','白舟','昭昭','平芜','江离','拾星','叩舷','未晏','知许','漠漠','迟迟','晚棠','书遥','鱼跃','澄川','扶摇'];
 const QUIRKS = ['总在赛后给对手递水','怕水呛，但动作最标准','会背整张泳道表','比赛前必听同一首歌','收集各地的泳池门票','说梦话都在打腿','从不看成绩榜，只看秒表','给每个对手起外号','赢了会请全队吃冰','认定你会站上领奖台'];
+/* 外国选手姓名：按国家特色取名 */
+const NAME_BOOK = {
+  '日本':{s:['佐藤','铃木','高桥','田中','渡边','小林'],g:['拓海','健太','大辉','凛','阳翔','结月']},
+  '韩国':{s:['金','李','朴','崔','郑','姜'],g:['敏俊','志焕','俊赫','书妍','智厚','多贤']},
+  '新加坡':{s:['李','陈','黄','林','张','吴'],g:['伟杰','俊铭','彦霖','慧敏','志强','佳恩']},
+  '泰国':{s:['颂猜','阿披察','尼瓦','塔纳','威罗特','差瓦立'],g:['蓬贴','功甘','瓦信','南隆','沙惕','昆拉']},
+  '卡塔尔':{s:['阿尔·哈马德','阿尔·库瓦里','阿尔·萨尼','阿尔·穆罕纳迪','阿尔·马拉菲','阿尔·多萨里'],g:['优素福','哈立德','塔米姆','穆罕默德','法赫德','阿卜杜拉']},
+  '阿联酋':{s:['阿尔·马克图姆','阿尔·侯赛尼','阿尔·努艾米','阿尔·沙姆西','阿尔·法拉西','阿尔·哈布西'],g:['拉希德','哈姆丹','奥马尔','赛义德','扎耶德','艾哈迈德']},
+  '土耳其':{s:['耶尔马兹','德米尔','卡拉','阿伊丁','厄兹图尔克','阿尔斯兰'],g:['穆罕默德','埃姆雷','凯南','布拉特','恰格拉尔','哈坎']},
+  '匈牙利':{s:['霍尔瓦特','基什','科瓦奇','内梅特','绍博','托特'],g:['佐尔坦','达维德','马顿','贝内德克','亚当','费伦茨']},
+  '法国':{s:['杜邦','勒克莱尔','莫罗','贝尔纳','洛朗','莫奈'],g:['莱昂','加斯东','雨果','朱尔','泰奥','路易']},
+  '英国':{s:['史密斯','威尔逊','泰勒','布朗','哈里森','沃克'],g:['奥利弗','乔治','哈里','弗雷迪','亚瑟','威廉']},
+  '德国':{s:['施密特','韦伯','瓦格纳','贝克尔','霍夫曼','舒尔茨'],g:['卢卡斯','马克西米利安','保罗','费利克斯','约纳斯','埃利亚斯']},
+  '荷兰':{s:['范德伯格','德容','范迪克','范德维尔德','德弗里斯','范霍斯特'],g:['卢卡','塞姆','达恩','杰斯珀','蒂斯','布伦']},
+  '意大利':{s:['罗西','法拉利','孔蒂','马尔凯蒂','比安基','罗马诺'],g:['马尔科','卢卡','亚历山德罗','马泰奥','洛伦佐','费德里科']},
+  '西班牙':{s:['加西亚','马丁内斯','洛佩斯','费尔南德斯','萨恩斯','纳瓦斯'],g:['巴勃罗','阿尔瓦罗','迭戈','马努埃尔','塞尔希奥','哈维']},
+  '俄罗斯':{s:['伊万诺夫','斯米尔诺夫','库兹涅佐夫','波波夫','索科洛夫','莫罗佐夫'],g:['亚历山大','德米特里','马克西姆','伊利亚','阿尔乔姆','尼基塔']},
+  '美国':{s:['安德森','汤普森','卡特','布鲁克斯','海耶斯','沙利文'],g:['卡森','亨特','蔡斯','布雷迪','兰登','韦斯利']},
+  '加拿大':{s:['麦克唐纳','特伦布莱','沃尔什','坎贝尔','弗雷泽','贝内特'],g:['诺亚','利亚姆','格雷森','科尔','梅森','布莱克']},
+  '巴西':{s:['席尔瓦','桑托斯','奥利维拉','科斯塔','佩雷拉','阿尔梅达'],g:['若昂','加布里埃尔','拉斐尔','马特乌斯','卢卡斯','恩里克']},
+  '澳大利亚':{s:['凯利','米切尔','帕克','里德','奥斯汀','摩根'],g:['杰克','莱利','芬恩','利亚姆','考登','布莱克']},
+  '埃及':{s:['哈桑','易卜拉欣','穆斯塔法','萨利赫','曼苏尔','法鲁克'],g:['奥马尔','卡里姆','陶菲克','齐亚德','尤瑟夫','阿米尔']}
+};
+function rosterName(p, used){
+  let nm, guard=0;
+  do{
+    if(p.intl){
+      const loc = INT_LOCS.find(l=>l.city===p.r);
+      const b = loc && NAME_BOOK[loc.country];
+      nm = b ? (pick(b.s)+pick(b.g)) : (pick(SURNAMES)+pick(GIVEN));
+    }else{ nm = pick(SURNAMES)+pick(GIVEN); }
+    guard++;
+  }while(used.indexOf(nm)>-1 && guard<40);
+  used.push(nm);
+  return nm;
+}
 const MEET_TIERS = [
   {name:'城市邀请赛', rivals:[40,55]},
   {name:'省锦标赛', rivals:[58,73]},
@@ -620,7 +670,7 @@ function buildRoster(){
   const roster = [];
   CITIES.forEach(c=>{ for(let i=0;i<5;i++) roster.push({r:c, intl:false}); });
   INT_LOCS.forEach(l=>{ for(let i=0;i<10;i++) roster.push({r:l.city, intl:true}); });
-  roster.forEach(p=>{ p.n = pick(SURNAMES)+pick(GIVEN); p.q = pick(QUIRKS); });
+  const _usedN = []; roster.forEach(p=>{ p.n = rosterName(p,_usedN); p.q = pick(QUIRKS); });
   return roster;
 }
 /* 结局解锁 */
@@ -712,6 +762,17 @@ function drawEndArt(id){
     person(78,62,'#d8d8d8','#9a9a9a');
     P(70,76,42,2,'rgba(255,255,255,.3)');
     for(let x=8;x<160;x+=14){ P(x,98,6,2,'rgba(255,255,255,.18)'); }
+  } else if(id==='coach'){
+    // 清晨的泳池：教练坐在池边，一排小孩晃着腿
+    sky('#7a9ec2','#a8c4d9');
+    for(let y=70;y<120;y++) P(0,y,160,1, y<92?'#2e6f9e':'#1d4e6b');
+    for(let x=6;x<160;x+=16){ P(x,86,12,1,'rgba(255,255,255,.28)'); }
+    P(0,68,160,4,'#c9c2b2');
+    person(22,52,'#3d5a80','#4a3a30');
+    person(58,54,'#e8798a','#7a4a2b'); person(74,52,'#8bc34a','#2a2a2a');
+    person(90,54,'#e6b45a','#7a4a2b'); person(106,52,'#b58ad6','#3a2a20');
+    person(122,54,'#5aa8cc','#7a4a2b'); person(138,52,'#e8e2d0','#2a2a2a');
+    P(0,108,160,12,'#4a5a6a');
   }
   return c.toDataURL('image/png');
 }
@@ -1323,6 +1384,16 @@ function afterAction(kind){
     forceEnd('retire40');
     save(); render(); return;
   }
+  // 35 岁的岔路口：天赋不够，国际赛的前三够不着了
+  if(!S.over && !S.coachAsked && S.age >= 35 && S.talent < 60){
+    S.coachAsked = true; save();
+    queueModal('三 十 五 岁',
+      '35 岁了。天赋停在 '+Math.round(S.talent)+'——教练翻着你的成绩册，欲言又止。<br><br>这个天赋，国际赛的前三可能真的够不着了。<br><br>要不要……试试另一条路？',
+      [
+        {label:'接过教鞭', cb:()=>{ setTimeout(()=>forceEnd('coach'), 0); }},
+        {label:'再游几年', cb:()=>{ addLog('你说：我还想再游几年。教练点点头，没再提这件事。', true); save(); }}
+      ]);
+  }
   // 队内考核：每 200 天一个周期，训练量不达标会被筛出队伍
   if(!S.assess) S.assess = { next: S.day + 200, last: S.trained, streak: 0, fails: 0 };
     if(S.assess.streak===undefined) S.assess.streak = 0;
@@ -1426,8 +1497,16 @@ const EVENTS = [
   '脖子有点僵，队医捏了两下，酸得龗牙咧嘴。',
   '电视里在放游泳比赛，看到熟悉的对手赢了好几场。',
   '阳台上的多肉长出新叶子了，比想象中顽强。',
-  '梦见自己压水压得太深，醒来发现腿真的在动。'
-];
+  '梦见自己压水压得太深，醒来发现腿真的在动。',
+  '隔壁泳道的人在练出发，入水几乎没有水花，你偷偷记了三页笔记。',
+  '训练基地的猫蹲在出发台上，谁都不敢赶，教练绕着走了。',
+  '新泳镜起雾了，用牙膏搓了一遍，居然好了。',
+  '晚上加练完，抬头看见月亮泡在泳池里，捞不起来。',
+  '食堂电视在放短道速滑，一群人围着看，忘了打饭。',
+  '更衣室的灯闪了一晚，像在给节奏打拍子。',
+  '教练的保温杯里泡着枸杞，他说这叫科学训练。',
+  '泳池的消毒水味儿今天格外重，教练说这是安心的味道。',
+  ];
 /* ================= 四季（360 天一年，每季 90 天） ================= */
 const SEASONS = [
   {name:'春', icon:'🌸', note:'春训 · 水刚刚回暖，一切都稳稳的',   gain:1.00, fat:1.00, sick:1.00, evt:1.00},
@@ -1460,9 +1539,9 @@ function mateNote(pool){
 }
 function randomEvent(){
   const ev = season().evt;
-  if(Math.random()<0.04){ offerSupplement(); return; }
-  if(Math.random()<0.07*ev){ offerSpecialEvent(); return; }
-  if(Math.random()<0.08*ev) addLog(pick(EVENTS), true);
+  if(Math.random()<0.05){ offerSupplement(); return; }
+  if(Math.random()<0.10*ev){ offerSpecialEvent(); return; }
+  if(Math.random()<0.14*ev) addLog(pick(EVENTS), true);
 }
 /* 突发事件：带选择的特殊事件 */
 const SPECIAL_EVENTS = [
@@ -1489,8 +1568,17 @@ const SPECIAL_EVENTS = [
     {label:'婉拒', cb:()=>{ addLog('婉拒了赞助：「先拿成绩说话。」'); }}]},
   {t:'教 小 朋 友', b:'周末市里有公益活动，请你去教一群小朋友玩水。<br><br>半天时间，去吗？', opts:[
     {label:'去教他们', cb:()=>{ S.health=clamp(S.health+4,0,100); addLog('教了一下午小朋友打腿，被喊了好多次“教练”（健康 +4）。', true); }},
-    {label:'专心备战', cb:()=>{ S.trained+=10; addLog('推掉了活动，多练了一下午（训练量 +10）。'); }}]}
-];
+    {label:'专心备战', cb:()=>{ S.trained+=10; addLog('推掉了活动，多练了一下午（训练量 +10）。'); }}]},
+  {t:'泳 镜 断 了', b:'出发练习时泳镜带断了，备用的那副落在宿舍。<br><br>怎么办？', opts:[
+    {label:'游回宿舍拿', cb:()=>{ S.trained+=5; S.fatigue=clamp(S.fatigue+5,0,100); addLog('游回宿舍拿了备用泳镜，来回多游了两趟（训练量 +5，疲惫 +5）。', true); }},
+    {label:'闭眼接着游', cb:()=>{ if(Math.random()<0.5){ S.tech=clamp(S.tech+1,0,100); addLog('闭着眼游了一下午，水感反而清楚了几分（技巧 +1）。', true); } else { addLog('没有泳镜，眼睛被水泡得通红，练得不痛快。'); } }}]},
+  {t:'记 者 来 访', b:'市报的小记者想采访你：站上领奖台是什么感觉？<br><br>接受采访吗？', opts:[
+    {label:'认真聊聊', cb:()=>{ S.diligence=clamp(S.diligence+2,0,100); addLog('采访见报了，你把剪报贴在了柜门上（勤奋 +2）。', true); }},
+    {label:'让给队友', cb:()=>{ addLog('把采访让给了队友，他紧张得连说了八个「嗯」。'); }}]},
+  {t:'同 屋 病 了', b:'同屋的队友发烧了，队医让他躺着休息。<br><br>你去照顾他吗？（自己也有点风险）', opts:[
+    {label:'去照顾他', cb:()=>{ if(Math.random()<0.3){ S.sick=true; addLog('队友退烧了，你却开始鼻塞……（生病了）', true); } else { S.diligence=clamp(S.diligence+2,0,100); addLog('端了三天粥，队友好了，你们的关系更近了（勤奋 +2）。', true); } }},
+    {label:'交给队医', cb:()=>{ addLog('队医接管了一切，你默默给自己的柜子消了毒。'); }}]},
+  ];
 function offerSpecialEvent(){
   const ev = pick(SPECIAL_EVENTS);
   queueModal(ev.t, ev.b, ev.opts.map(o=>({label:o.label, cb:()=>{
@@ -2551,6 +2639,7 @@ function load(){
     if(!S.gear) S.gear={};
     if(!S.tapeUntil) S.tapeUntil=0;
     if(!S.roster) S.roster = buildRoster();
+    if(!S.nameVer){ S.nameVer = 1; const _un = []; (S.roster||[]).forEach((p,i)=>{ if((S.metIdx||[]).indexOf(i)<0) p.n = rosterName(p,_un); }); }
     if(!S.metIdx) S.metIdx=[];
     if(!S.endings) S.endings={};
     if(S.friends) S.friends.forEach(f=>{ if(!f.fav) f.fav = SOUVENIRS.slice().sort(()=>Math.random()-0.5).slice(0,2).map(s=>s.id); if(!f.stage) f.stage=0; });
@@ -2982,8 +3071,6 @@ function drawRoom(){
       else {
         P(sl.x,sl.y,66,44,'#8fb8cc');
         P(sl.x,sl.y+26,66,18,'#6d98ad');
-        g.fillStyle='#fff'; g.font='9px sans-serif'; g.textAlign='center';
-        g.fillText(key.split('@')[1], sl.x+33, sl.y+38);
       }
       g.fillStyle='#d65a5a'; g.beginPath(); g.arc(sl.x+33,sl.y-1,3,0,7); g.fill();
     } else {
@@ -3021,16 +3108,24 @@ function drawRoom(){
     g.fillStyle=c; g.beginPath(); g.arc(mx,245,7,0,7); g.fill();
     g.fillStyle='rgba(0,0,0,.2)'; g.beginPath(); g.arc(mx-2,243,2.4,0,7); g.fill();
   });
-  g.fillStyle='rgba(255,255,255,.75)'; g.font='12px sans-serif'; g.textAlign='left';
-  g.fillText('奖牌 🥇'+S.medals.gold+' 🥈'+S.medals.silver+' 🥉'+S.medals.bronze, 24, 262);
   // 右下角：床头小桌 + 台灯
   P(372,240,92,28,'#5a4636'); P(380,214,8,26,'#5a4636');
   P(376,196,16,20,'#e8c88a'); P(380,216,4,4,'#5a4636');
   g.fillStyle='rgba(232,200,138,.25)'; g.beginPath(); g.moveTo(376,214); g.lineTo(392,214); g.lineTo(404,268); g.lineTo(364,268); g.fill();
   // 足迹
   const cn = CITIES.filter(c=>S.dex.cn[c]).length, it = INT_LOCS.filter(l=>S.dex.intl[l.country]).length;
-  g.fillStyle='rgba(255,255,255,.6)'; g.font='11px sans-serif'; g.textAlign='left';
-  g.fillText('足迹 '+cn+'/'+CITIES.length+' · '+it+'/'+INT_LOCS.length, 330, 288);
+  // 文字清晰化：小字搬到 HTML 标签层
+  const lb = $('roomLabels');
+  if(lb){
+    let h = '';
+    ROOM_CARD_SLOTS.forEach((sl,i)=>{
+      const key = S.wall.card[i];
+      if(key) h += '<span class="rlab" style="left:'+((sl.x+33)/4.8)+'%;top:'+((sl.y+34)/3)+'%">'+key.split('@')[1]+'</span>';
+    });
+    h += '<span class="rlab rlabL" style="left:5%;top:'+(257/3)+'%">奖牌 🥇'+S.medals.gold+' 🥈'+S.medals.silver+' 🥉'+S.medals.bronze+'</span>';
+    h += '<span class="rlab rlabL" style="left:'+(330/4.8)+'%;top:'+(284/3)+'%">足迹 '+cn+'/'+CITIES.length+' · '+it+'/'+INT_LOCS.length+'</span>';
+    lb.innerHTML = h;
+  }
 }
 function roomClick(e){
   const cv = $('roomWall');
@@ -3135,10 +3230,12 @@ function showHelp(){
     H('🎂 成长与年龄', L([
       '360 天 = 1 岁，每年生日涨 1 岁',
       '童子班水感学得快 → 青苗期 → 黄金期 → 成熟期 → 老将（靠经验吃饭）',
-      '40 岁规则会让你上岸——结局「四十岁的浪」'
+      '40 岁规则会让你上岸——结局「四十岁的浪」',
+      '35 岁那年如果天赋不足 60（够不着国际赛前三），教练会问你要不要接过教鞭：转行触发结局「希望你们比我更好」，拒绝就继续游',
+      '外国对手各有各的名字：日本选手叫佐藤拓海，土耳其选手叫耶尔马兹·埃姆雷，跟真实赛场一样'
     ])) +
     H('🏁 结局与成就', L([
-      '结局只有 5 个，全部会结束生涯：奥运夺冠 / 转行 / 伤病退役 / 队内淘汰 / 40 岁退役',
+      '结局共有 6 个，全部会结束生涯：奥运夺冠 / 告别泳池 / 伤病退役 / 队内淘汰 / 40 岁退役 / 转行教练',
       '成就不结束生涯，共 7 项：32 岁仍在坚持 / 累计 15 金 / 连胜 10 场 / 图鉴全收集 / 5 位好友满好感 / 结识所有人 / 累计 30 场比赛',
       '成就进度在收藏栏「🏆 成就」页随时可查；合上的手账在首页「回看手账」里'
     ])) +
