@@ -371,6 +371,7 @@
       <div class="tab" data-tab="friends">好友</div>
       <div class="tab" data-tab="items">收藏</div>
       <div class="tab" data-tab="mail">信箱</div>
+      <div class="tab" data-tab="yearly">年页</div>
       <div class="tab" data-tab="gear">道具</div>
       <div class="tab" data-tab="dex">房间</div>
       <div class="tab" data-tab="medals">战绩</div>
@@ -390,6 +391,7 @@
       <div id="mailList"></div>
       <div class="hint" id="mailHint"></div>
     </div>
+    <div class="panel" id="panel-yearly"><div id="yearlyList"></div></div>
     <div class="panel" id="panel-gear">
       <div id="gearList"></div>
       <div class="hint" id="gearHint">道具在比赛时从赞助商摊位购得——买装备会分心，但特殊功能关键时刻能救命。</div>
@@ -553,6 +555,148 @@ function rivalHook(meetName, city, rank, isIntl){
   save();
   checkEndings();
   return extra;
+}
+/* ===== 年度总结页（v15）：每年生日，手账自动写一页"这一年" ===== */
+const YEAR_LINE_GOLD = [
+  '领奖台的阶梯有点滑，明年记得穿防滑的拖鞋上去。',
+  '国歌响的时候，水花还没干。',
+  '金牌会氧化，但转身压得很低的那种踏实，不会。'
+];
+const YEAR_LINE_SWEAT = [
+  '数字不响，但它记得每天早上五点半的闹钟。',
+  '今年没赢什么，不过池底的每一米都作数。',
+  '留过的汗不说话，它们只是慢慢变成了明年的底气。'
+];
+const YEAR_LINE_CALM = [
+  '平静的一年。水记得你来过，就够了。',
+  '有些年用来冲刺，有些年用来把自己泡稳。',
+  '没故事的年份，是留给故事的年份。'
+];
+function yearSnap(){
+  return {trained:S.trained, gold:S.medals.gold, silver:S.medals.silver, bronze:S.medals.bronze,
+    met:S.metIdx.length, rw:(S.rival?S.rival.h2h.w:0), rl:(S.rival?S.rival.h2h.l:0)};
+}
+function buildYearly(){
+  const z = {trained:0, gold:0, silver:0, bronze:0, met:0, rw:0, rl:0};
+  const c = S.ySnap || z;
+  const d = yearSnap();
+  const p = {
+    y: S.age - S.startAge, age: S.age,
+    trained: Math.max(0, d.trained - (c.trained||0)),
+    gold: Math.max(0, d.gold - (c.gold||0)),
+    silver: Math.max(0, d.silver - (c.silver||0)),
+    bronze: Math.max(0, d.bronze - (c.bronze||0)),
+    met: Math.max(0, d.met - (c.met||0)),
+    rw: Math.max(0, d.rw - (c.rw||0)),
+    rl: Math.max(0, d.rl - (c.rl||0))
+  };
+  S.ySnap = d;
+  if(!S.yearly) S.yearly = [];
+  S.yearly.push(p);
+  return p;
+}
+function yearPageHtml(p){
+  const pool = p.gold >= 3 ? YEAR_LINE_GOLD : (p.trained >= 90 ? YEAR_LINE_SWEAT : YEAR_LINE_CALM);
+  const ln = pick(pool);
+  return '<div class="letterPaper"><div style="font-size:12px;color:var(--ink-soft);margin-bottom:4px">第 '+p.y+' 年 · '+p.age+' 岁</div>'
+    +'<div class="letterHand" style="font-size:15px">今年练了 '+p.trained+' 的量，拿了 🥇'+p.gold+' 🥈'+p.silver+' 🥉'+p.bronze
+    +(p.met?'，认识了 '+p.met+' 个新朋友':'')+'。'
+    +((p.rw+p.rl)?'<br>和TA交手：'+p.rw+' 胜 '+p.rl+' 负。':'')
+    +'<br><br>'+ln+'</div></div>';
+}
+function yearlyTick(){
+  const p = buildYearly();
+  sfx('page');
+  queueModal('年 度 · 第 '+p.y+' 年', yearPageHtml(p), [{label:'收好这一页', cb:()=>{}}]);
+}
+function renderYearly(){
+  const el = $('yearlyList'); if(!el) return;
+  const ys = S.yearly || [];
+  if(!ys.length){ el.innerHTML = '<div class="hint">生日那天，手账会自动替你写一页「这一年」。写好的都收在这里。</div>'; return; }
+  el.innerHTML = ys.map((p,i)=>'<div class="meetItem" style="cursor:pointer;text-align:left" onclick="openYearly('+i+')"><b>第 '+p.y+' 年</b> · '+p.age+' 岁<br><span style="font-size:12px">🥇'+p.gold+' 🥈'+p.silver+' 🥉'+p.bronze+' · 训练量 '+p.trained+((p.rw+p.rl)?' · 宿敌 '+p.rw+'胜'+p.rl+'负':'')+'</span></div>').join('');
+}
+function openYearly(i){
+  const p = (S.yearly||[])[i]; if(!p) return;
+  sfx('tap');
+  queueModal('年 度 · 第 '+p.y+' 年', yearPageHtml(p), [{label:'合上这一页', cb:()=>{}}]);
+}
+/* ===== 康复小屋（v15）：身体警报后，每天多一个去处 ===== */
+function openRehab(){
+  sfx('tap');
+  showModal('康 复 小 屋',
+    '队医拍了拍理疗床：「躺下吧。」<br><br>疲惫 <b>'+S.fatigue+'</b> · 身体警报 <b>'+(S.burn100||0)+'</b> / 4<br><br><span style="font-size:12px;color:var(--ink-soft)">配合静养最稳妥。要是你偷偷下水……队医可就看不住你了。</span>',
+    [
+      {label:'配合静养', cb:()=>{ setTimeout(rehabRest, 0); }},
+      {label:'偷偷下水', cb:()=>{ setTimeout(rehabSneak, 0); }}
+    ]);
+}
+function rehabRest(){
+  sfx('rest');
+  S.fatigue = clamp(S.fatigue - 30, 0, 100);
+  S.health = clamp(S.health + 5, 0, 100);
+  if(S.burn100 > 0) S.burn100--;
+  S.restStreak = (S.restStreak||0) + 1;
+  addLog('在康复小屋泡了半天理疗，肩膀一寸寸松下来。（疲惫 -30 · 警报 -1）');
+  afterAction('rehab');
+}
+function rehabSneak(){
+  sfx('gym');
+  S.trained += 20;
+  S.fatigue = clamp(S.fatigue + 15, 0, 100);
+  if(Math.random() < 0.3){
+    S.burn100 = (S.burn100||0) + 1;
+    addLog('偷偷下水加练，结果旧伤一抽——疼出一身冷汗，被队医逮个正着。（训练量 +20 · 警报 +1）', true);
+  } else {
+    addLog('趁队医喝水的空当溜进泳池，游完再溜回来，没人发现。（训练量 +20）');
+  }
+  afterAction('rehab');
+}
+/* ===== 上岸之后（v15）：手账合上后，看看大家后来去了哪 ===== */
+const LATER_ROLES = [
+  {r:'当了教练', t:'回省队带了小孩，凶起来和当年让你发怵的那个教练一模一样。'},
+  {r:'进了解说席', t:'一开口，全网的表情包都是TA的。'},
+  {r:'开了游泳班', t:'学员里小孩最多，上课铃是一枚旧哨子。'},
+  {r:'当了体育老师', t:'每年运动会都坚持表演一次出发跳。'},
+  {r:'回老家当了救生员', t:'说离水近一点，心里踏实。'},
+  {r:'转行做了康复师', t:'专门治你们这种"当年硬扛"留下的老伤。'},
+  {r:'改练铁人三项', t:'说游泳那段总是领先，有点无聊。'},
+  {r:'考了潜水证', t:'说泳池太小，装不下大海。'},
+  {r:'开了家面馆', t:'墙上挂着一排旧奖牌，没人问就不解释。'}
+];
+const LATER_RIVAL = [
+  '还在游。省队的泳池晚上十点灯还亮着，加练名单上有TA的名字。',
+  '进了国家队。采访里被问到最强的对手，TA说了你的名字。',
+  '拿了全运会金牌。领奖时朝你常站的那侧看台挥了挥手。',
+  '退役那天在池边站了很久，把用了十年的泳镜留在了出发台上。'
+];
+function buildLater(endingId){
+  const used = [];
+  const mk = (name, city) => {
+    let r, guard = 0;
+    do { r = pick(LATER_ROLES); guard++; } while(used.indexOf(r.r) > -1 && guard < 15);
+    used.push(r.r);
+    return {name:name, city:(city||'队里'), r:r.r, line:r.t};
+  };
+  const people = (S.friends||[]).map(f=>mk(f.name, f.city));
+  (S.mates||[]).forEach(m=>{ if(m && m.name) people.push(mk(m.name, '队里')); });
+  let rival = null;
+  if(S.rival) rival = (endingId==='coach') ? '把TA自己的孩子送进了你的游泳班，学费一分不让。' : pick(LATER_RIVAL);
+  return {people:people, rival:rival};
+}
+function laterHtml(){
+  const L = S.later || buildLater(S.over ? (S.lastEndId||'def') : 'def');
+  let h = '<div class="letterPaper"><div style="font-size:13px;color:var(--ink-soft);margin-bottom:6px">手账合上之后——</div>';
+  if(!L.people.length) h += '<div class="letterHand" style="font-size:14px">这本手账里还没有别人。水会记得你，就够了。</div>';
+  L.people.forEach(p=>{
+    h += '<div style="margin:10px 0;line-height:1.9"><b>'+p.name+'</b><span style="font-size:12px;color:var(--ink-soft)">（'+p.city+'）</span><br><span class="letterHand" style="font-size:14px">'+p.r+'——'+p.line+'</span></div>';
+  });
+  if(L.rival) h += '<div style="margin:10px 0;line-height:1.9"><b>⚔ '+S.rival.name+'</b><span style="font-size:12px;color:var(--ink-soft)">（'+S.rival.city+'）</span><br><span class="letterHand" style="font-size:14px">'+L.rival+'</span></div>';
+  h += '<div class="letterSign">泳池记得每一个认真游过的人</div></div>';
+  return h;
+}
+function openLater(){
+  sfx('tap');
+  showModal('上 岸 之 后', laterHtml(), [{label:'合上手账', cb:()=>{}}]);
 }
 function rivalYearly(){
   const rv = S.rival;
@@ -1063,6 +1207,7 @@ function newGame(name, age, gender){
     gear:{}, suitBuff:false, gelBuff:false, tapeUntil:0, sponsorAsked:false, meetDistract:false,
     roster: buildRoster(), metIdx:[], endings:{},
     mates: buildMates(), lastSeason: 0,
+    ySnap: null, yearly: [], later: null,
     stroke:null, strokeRefusedId:null, wall:{card:{}, shelf:{}}, relayDay:null,
     hairstyle:_look.hair, suitColor:_look.suit, skinColor:_look.skin
   };
@@ -1490,6 +1635,7 @@ function doAction(kind){
     S.sick=false; S.health=clamp(S.health+10,0,100);
     addLog('看了医生，吃了药，好好睡了一觉。');
   }
+  else if(kind==='rehab'){ openRehab(); return; }
   else if(kind==='main'){
     finishMain(1); afterAction('main');
     return;
@@ -1560,7 +1706,7 @@ function afterAction(kind){
   if(ns !== S.lastSeason){ S.lastSeason = ns; seasonTurn(); }
   // 生日与年龄增长（360 天 = 1 岁）
   const na = S.startAge + Math.floor((S.day-1)/360);
-  if(na > S.age){ S.age = na; addLog('过了个生日——'+S.age+' 岁了，生日愿望是游得再快一点。', true); }
+  if(na > S.age){ S.age = na; addLog('过了个生日——'+S.age+' 岁了，生日愿望是游得再快一点。', true); yearlyTick(); }
   rivalYearly();
   checkEndings();
   careerEndCheck();
@@ -1992,6 +2138,8 @@ function offerRetire(){
 /* 强制结束：结局 = 生涯到此为止（champion/farewell/injury/cut/retire40） */
 function forceEnd(id, extraLine){
   S.over = true;
+  S.lastEndId = id;
+  S.later = buildLater(id);
   const win = (id==='champion');
   sfx(win ? 'win' : 'sad');
   if(!S.endings[id]) S.endings[id] = true;
@@ -2007,7 +2155,7 @@ function forceEnd(id, extraLine){
     b:'<img class="pcImg pixImg" src="'+src+'"'+errAttr+'><div class="pcCap">'+e.t+'</div>'+(extraLine?extraLine+'<br><br>':'')+e.b.replace(/\{name\}/g, S.name)+(S.mates&&S.mates.length?'<br><br><span style="font-size:12px;color:var(--ink-soft)">柜门上的最后一张便签 · '+pick(S.mates).name+'：「'+pick(FAREWELL_NOTES)+'」</span>':'')+(S.rival?'<br><br><span style="font-size:12px;color:var(--ink-soft)">⚔ 宿敌 · '+S.rival.name+'：「'+(RIVAL_ENDS[id]||RIVAL_ENDS.def)+'」</span>':'')});
   _mq.push({t:'手 账 之 后',
     b:'泳池生涯 · '+fmtMonths(Math.ceil(S.day/30))+'<br>累计训练量 '+S.trained+'<br>奖牌 🥇'+m.gold+' 🥈'+m.silver+' 🥉'+m.bronze+'<br>朋友 '+S.friends.length+' 人<br>成就 '+ACH.filter(a=>S.ach&&S.ach[a.id]).length+' / '+ACH.length+'<br><br>'+(id==='injury'?'不是不想游，是身体先说了再见。':(id==='farewell'?'那片水，会记得TA来过。':(id==='champion'?'掌声落下，TA把最好的年纪留给了泳池。':'手账合上了，泳池记得每一个认真游过的人。'))),
-    btns:[{label:'重新翻开一本手账', cb:resetGame}]});
+    btns:[{label:'翻到后来篇', cb:()=>{ setTimeout(openLater, 0); }},{label:'重新翻开一本手账', cb:resetGame}]});
   flushMilestones();
 }
 function gameOver(){ forceEnd('farewell'); }
@@ -2819,6 +2967,9 @@ function load(){
     if(S.assess.streak===undefined) S.assess.streak = 0;
     if(S.assess.fails===undefined) S.assess.fails = 0;
     if(S.burn100===undefined) S.burn100 = 0;
+  if(S.yearly===undefined) S.yearly = [];
+  if(S.ySnap===undefined) S.ySnap = null;
+  if(S.later===undefined) S.later = null;
     if(S.coachUntil===undefined) S.coachUntil = 0;
     if(S.meet7===undefined) S.meet7 = null;
     // 力量/技巧硬上限 100：把历史存档里溢出的部分压回去
@@ -2883,10 +3034,12 @@ function render(){
     '<button class="act" onclick="doAction(\'tech\')"><div class="t">技术课</div><div class="d">打磨转身、出发与水感</div></button>' +
     '<button class="act" onclick="doAction(\'strength\')"><div class="t">力量课</div><div class="d">陆上体能，比赛的后半程靠它</div></button>' +
     '<button class="act" onclick="doAction(\'rest\')"><div class="t">休息</div><div class="d">降低疲惫，恢复健康</div></button>' +
-    (S.sick ? '<button class="act wide actTreat" onclick="doAction(\'treat\')"><div class="t">去看医生</div><div class="d">病好了才能好好训练</div></button>' : '');
+    (S.sick ? '<button class="act wide actTreat" onclick="doAction(\'treat\')"><div class="t">去看医生</div><div class="d">病好了才能好好训练</div></button>' : '') +
+    ((S.burn100||0) >= 2 && !S.over ? '<button class="act wide actTreat" onclick="doAction(\'rehab\')"><div class="t">去康复小屋</div><div class="d">身体在报警——队医在理疗室等你</div></button>' : '');
 
   renderLog();
   renderAch();
+  renderYearly();
   renderAssessNote();
   renderSeasonNote();
   renderStrokeNote();
@@ -3116,7 +3269,7 @@ function showEndSummary(){
   _mq.push({t:'手 账 之 后',
     b:(lastEnd ? '<div style="font-size:13px;color:var(--ink-soft);margin-bottom:6px">'+lastEnd.t+'</div>' : '')
       +'泳池生涯 · '+fmtMonths(Math.ceil(S.day/30))+'<br>累计训练量 '+S.trained+'<br>奖牌 🥇'+m.gold+' 🥈'+m.silver+' 🥉'+m.bronze+'<br>朋友 '+S.friends.length+' 人<br>成就 '+ACH.filter(a=>S.ach&&S.ach[a.id]).length+' / '+ACH.length+'<br><br>这本手账已经合上了。',
-    btns:[{label:'重新翻开一本手账', cb:resetGame}]});
+    btns:[{label:'翻到后来篇', cb:()=>{ setTimeout(openLater, 0); }},{label:'重新翻开一本手账', cb:resetGame}]});
   flushMilestones();
 }
 /* ===== 4x100 接力：挑三个伙伴，一起游 ===== */
@@ -3446,6 +3599,11 @@ function showHelp(){
       '宿敌的实力跟着你长：甩不掉，也躲不开。交手 10 场、交情处满，各有一枚成就',
       '每年年底他会寄来一张年度战绩单——数字先放着，水里见',
       '全国赛拿过前三，信箱开张：粉丝来信是手写的字，拆开能读能回，收藏栏随时翻看'
+    ])) +
+    H('📖 年页 · 康复 · 后来', L([
+      '每年生日，手账自动替你写一页「这一年」——训练量、奖牌、新朋友、和TA的交手账，收藏栏「年页」随时翻看',
+      '疲惫拉满 100 累计 2 次后，今日安排会出现康复小屋：配合静养能消一次警报；偷偷下水加训练量，但三成概率加重伤情',
+      '手账合上后的结算页，可以「翻到后来篇」——看看队友、好友和宿敌上岸之后都去了哪'
     ])) +
     H('🏨 大赛周 · 七日位面', L([
       '省锦标赛及以上、全部国际赛走七日赛程，不占训练天数',
