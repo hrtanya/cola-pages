@@ -362,7 +362,7 @@
     <div class="laneRow" id="laneRow"></div>
 
     <div class="sec">
-      <div class="secTitle">今 日 安 排 · 第 <span id="dayNum"></span> 月 · <span id="dayOfMonth"></span> 日</div>
+      <div class="secTitle">今 日 安 排 · 第 <span id="yearNum"></span> 年 第 <span id="dayNum"></span> 月 · <span id="dayOfMonth"></span> 日</div>
       <div class="actions" id="actions"></div>
     </div>
 
@@ -587,7 +587,7 @@ const MAIL_POOL = [
   {who:'体育记者 · 老韩', text:'跑了十年游泳线，见过太多昙花一现。但你这半年的曲线不一样——稳，稳得吓人。写这封信没别的意思，就是提前跟你要一句夺冠感言。留着用。'},
   {who:'一封没有署名的信', text:'致现在的你：还记得八岁那年第一次下水吗？呛了三口水，抓着池边不肯松。后来的每一米，都是你替那时候的自己游的。谢谢你没松手。'}
 ];
-function mailDate(d){ return monthOf(d)+'月'+dayOfM(d)+'日'; }
+function mailDate(d){ return fmtD(d); }
 function letterHtml(l){
   return '<div class="letterPaper"><div class="letterHand">'+l.text+'</div><div class="letterSign">—— '+l.who+' · '+mailDate(l.day)+'</div></div>';
 }
@@ -978,7 +978,10 @@ const has = id => S.traits.includes(id);
 const TICK = 10;
 const monthOf = d => Math.floor((d-1)/30)+1;
 const dayOfM = d => ((d-1)%30)+1;
-const fmtD = d => monthOf(d)+'月'+dayOfM(d)+'日';
+const yearOf = d => Math.floor((d-1)/360)+1;
+const monInY = d => Math.floor(((d-1)%360)/30)+1;
+const fmtD = d => '第'+yearOf(d)+'年'+monInY(d)+'月'+dayOfM(d)+'日';
+const fmtMonths = n => { const y = Math.floor((n-1)/12), m = n - y*12; return y>0 ? y+' 年 '+m+' 个月' : m+' 个月'; };
 /* 地标照片库（图鉴/明信片大图用），分身核验后填入 */
 const LANDMARKS = {
   '南京':   {name:'夫子庙秦淮河', url:'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/KuiGuangGe_of_Nanjing_Confucian_Temple.jpg/500px-KuiGuangGe_of_Nanjing_Confucian_Temple.jpg'},
@@ -2003,7 +2006,7 @@ function forceEnd(id, extraLine){
   _mq.push({t:'结 局 · '+e.t,
     b:'<img class="pcImg pixImg" src="'+src+'"'+errAttr+'><div class="pcCap">'+e.t+'</div>'+(extraLine?extraLine+'<br><br>':'')+e.b.replace(/\{name\}/g, S.name)+(S.mates&&S.mates.length?'<br><br><span style="font-size:12px;color:var(--ink-soft)">柜门上的最后一张便签 · '+pick(S.mates).name+'：「'+pick(FAREWELL_NOTES)+'」</span>':'')+(S.rival?'<br><br><span style="font-size:12px;color:var(--ink-soft)">⚔ 宿敌 · '+S.rival.name+'：「'+(RIVAL_ENDS[id]||RIVAL_ENDS.def)+'」</span>':'')});
   _mq.push({t:'手 账 之 后',
-    b:'泳池生涯 · '+Math.ceil(S.day/30)+' 个月<br>累计训练量 '+S.trained+'<br>奖牌 🥇'+m.gold+' 🥈'+m.silver+' 🥉'+m.bronze+'<br>朋友 '+S.friends.length+' 人<br>成就 '+ACH.filter(a=>S.ach&&S.ach[a.id]).length+' / '+ACH.length+'<br><br>'+(id==='injury'?'不是不想游，是身体先说了再见。':(id==='farewell'?'那片水，会记得TA来过。':(id==='champion'?'掌声落下，TA把最好的年纪留给了泳池。':'手账合上了，泳池记得每一个认真游过的人。'))),
+    b:'泳池生涯 · '+fmtMonths(Math.ceil(S.day/30))+'<br>累计训练量 '+S.trained+'<br>奖牌 🥇'+m.gold+' 🥈'+m.silver+' 🥉'+m.bronze+'<br>朋友 '+S.friends.length+' 人<br>成就 '+ACH.filter(a=>S.ach&&S.ach[a.id]).length+' / '+ACH.length+'<br><br>'+(id==='injury'?'不是不想游，是身体先说了再见。':(id==='farewell'?'那片水，会记得TA来过。':(id==='champion'?'掌声落下，TA把最好的年纪留给了泳池。':'手账合上了，泳池记得每一个认真游过的人。'))),
     btns:[{label:'重新翻开一本手账', cb:resetGame}]});
   flushMilestones();
 }
@@ -2023,7 +2026,7 @@ function showHistory(){
   let h = [];
   try{ h = JSON.parse(localStorage.getItem('swimlog_history_v1')||'[]'); }catch(err){}
   if(!h.length){ showModal('回 看 手 账', '还没有合上的手账。<br><br>结束一段生涯后，它会躺在这里等你回来翻。'); return; }
-  const rows = h.map(r=>'<div class="meetItem" style="text-align:left"><b>'+r.name+'</b> · '+r.age+' 岁 · '+r.months+' 个月<br><span style="font-size:12px">🥇'+r.gold+' 🥈'+r.silver+' 🥉'+r.bronze+' · 训练量 '+r.trained+' · 朋友 '+r.friends+' 人</span><br><span style="font-size:11px;color:var(--accent)">结局「'+r.ending+'」</span></div>').join('');
+  const rows = h.map(r=>'<div class="meetItem" style="text-align:left"><b>'+r.name+'</b> · '+r.age+' 岁 · '+fmtMonths(r.months)+'<br><span style="font-size:12px">🥇'+r.gold+' 🥈'+r.silver+' 🥉'+r.bronze+' · 训练量 '+r.trained+' · 朋友 '+r.friends+' 人</span><br><span style="font-size:11px;color:var(--accent)">结局「'+r.ending+'」</span></div>').join('');
   showModal('回 看 手 账', rows);
 }
 
@@ -2848,7 +2851,7 @@ function render(){
   $('btnSetting').style.display='block';
   bgmEnsure();
   $('hName').textContent = S.name;
-  $('hSub').textContent = '第 '+monthOf(S.day)+' 月 · '+S.age+' 岁 · 累计训练量 '+S.trained;
+  $('hSub').textContent = '第 '+yearOf(S.day)+' 年 第 '+monInY(S.day)+' 月 · '+S.age+' 岁 · 累计训练量 '+S.trained;
   $('hTraits').innerHTML = S.traits.map(t=>{
     const d = TRAITS.find(x=>x.id===t);
     return '<span class="trait" title="'+d.desc+'">'+d.name+'</span>';
@@ -2871,7 +2874,8 @@ function render(){
   attachLane();
   $('sickBadge').innerHTML = S.sick ? '<span class="badgeSick">生病中 · 训练效果大打折扣</span>' : '';
 
-  $('dayNum').textContent = monthOf(S.day);
+  $('yearNum').textContent = yearOf(S.day);
+  $('dayNum').textContent = monInY(S.day);
   $('dayOfMonth').textContent = dayOfM(S.day);
   const fatNote = S.fatigue>=80 ? ' · 非常疲惫' : (S.fatigue>=50?' · 有点累':'');
   $('actions').innerHTML =
@@ -3111,7 +3115,7 @@ function showEndSummary(){
   const lastEnd = S.log ? S.log.filter(l=>l.t.indexOf('生涯结束') > -1)[0] : null;
   _mq.push({t:'手 账 之 后',
     b:(lastEnd ? '<div style="font-size:13px;color:var(--ink-soft);margin-bottom:6px">'+lastEnd.t+'</div>' : '')
-      +'泳池生涯 · '+Math.ceil(S.day/30)+' 个月<br>累计训练量 '+S.trained+'<br>奖牌 🥇'+m.gold+' 🥈'+m.silver+' 🥉'+m.bronze+'<br>朋友 '+S.friends.length+' 人<br>成就 '+ACH.filter(a=>S.ach&&S.ach[a.id]).length+' / '+ACH.length+'<br><br>这本手账已经合上了。',
+      +'泳池生涯 · '+fmtMonths(Math.ceil(S.day/30))+'<br>累计训练量 '+S.trained+'<br>奖牌 🥇'+m.gold+' 🥈'+m.silver+' 🥉'+m.bronze+'<br>朋友 '+S.friends.length+' 人<br>成就 '+ACH.filter(a=>S.ach&&S.ach[a.id]).length+' / '+ACH.length+'<br><br>这本手账已经合上了。',
     btns:[{label:'重新翻开一本手账', cb:resetGame}]});
   flushMilestones();
 }
