@@ -688,9 +688,9 @@ function laterHtml(){
   let h = '<div class="letterPaper"><div style="font-size:13px;color:var(--ink-soft);margin-bottom:6px">手账合上之后——</div>';
   if(!L.people.length) h += '<div class="letterHand" style="font-size:14px">这本手账里还没有别人。水会记得你，就够了。</div>';
   L.people.forEach(p=>{
-    h += '<div style="margin:10px 0;line-height:1.9"><b>'+p.name+'</b><span style="font-size:12px;color:var(--ink-soft)">（'+p.city+'）</span><br><span class="letterHand" style="font-size:14px">'+p.r+'——'+p.line+'</span></div>';
+    h += '<div style="margin:10px 0;line-height:1.9"><b style="color:#4a3b26">'+p.name+'</b><span style="font-size:12px;color:#8a6f48">（'+p.city+'）</span><br><span class="letterHand" style="font-size:14px">'+p.r+'——'+p.line+'</span></div>';
   });
-  if(L.rival) h += '<div style="margin:10px 0;line-height:1.9"><b>⚔ '+S.rival.name+'</b><span style="font-size:12px;color:var(--ink-soft)">（'+S.rival.city+'）</span><br><span class="letterHand" style="font-size:14px">'+L.rival+'</span></div>';
+  if(L.rival) h += '<div style="margin:10px 0;line-height:1.9"><b style="color:#4a3b26">⚔ '+S.rival.name+'</b><span style="font-size:12px;color:#8a6f48">（'+S.rival.city+'）</span><br><span class="letterHand" style="font-size:14px">'+L.rival+'</span></div>';
   h += '<div class="letterSign">泳池记得每一个认真游过的人</div></div>';
   return h;
 }
