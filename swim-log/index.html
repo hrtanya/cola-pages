@@ -985,6 +985,9 @@ const SOUVENIRS = [
   {id:'clip',  icon:'🐟', name:'鲨鱼发夹',   desc:'咬住头发的力度刚刚好'},
   {id:'cap',   icon:'🧢', name:'签名泳帽',   desc:'上面有个歪歪扭扭的签名'},
   {id:'relay', icon:'🥇', name:'接力赛纪念棒', desc:'四个人的浪，一次'},
+  {id:'capGlow', icon:'✨', name:'夜光泳帽', desc:'关了灯会发出幽幽的光，队友见了都眼馋'},
+  {id:'trophyMini', icon:'🏆', name:'迷你奖杯', desc:'掌心大小，摆在床头刚刚好'},
+  {id:'badgeOld', icon:'🛡️', name:'初代队徽', desc:'磨得发亮的老队徽，据说比馆里的历史还老'}
 ];
 const GIFT_THANKS = ['这也太懂我了吧！','你怎么知道我缺这个！','收下了，比赛给你带好运','我要摆在书桌上天天看','下次我也带东西送你'];
 const SAVE_KEY = 'swimlog_save_v3';
@@ -1202,7 +1205,7 @@ function newGame(name, age, gender){
     trialIdx:0, trialDay:null,
     meetDay:null,
     friends:[], medals:{gold:0,silver:0,bronze:0}, meets:[], log:[],
-    over:false, intCount:0, chats:0, swimX:0, laps:0, items:{},
+    over:false, intCount:0, chats:0, swimX:0, laps:0, items:{}, coins:0,
     dex:{cn:{}, intl:{}}, rewards:{}, buffDay:0, globalMult:1, restStreak:0, startAge: clamp(age,8,40),
     gear:{}, suitBuff:false, gelBuff:false, tapeUntil:0, sponsorAsked:false, meetDistract:false,
     roster: buildRoster(), metIdx:[], endings:{},
@@ -1354,8 +1357,8 @@ function openSwimGame(done, cfg){
   if(cfg.fan){ fanBox.style.display = 'flex'; $('sgFanName').textContent = '看台上 · '+cfg.fan.name+' 来看你了'; drawCrowd(); }
   else fanBox.style.display = 'none';
   $('swimGame').classList.add('on');
-  _sg = { done, hits:0, round:0, pos:0, dir:1, zoneL:0, zoneW:0, timer:null, over:false, cfg };
-  sgNext();
+  _sg = { done, hits:0, round:0, pos:0, dir:1, zoneL:0, zoneW:0, timer:null, over:false, cfg, phase:'swim', bonusHit:0, falseStarts:0, goTimer:null, t0:0 };
+  sgPrep();
 }
 /* 好友像素头像：发型/肤色/衣服按序号错开 */
 function drawFriendAvatar(el, f, i){
@@ -1390,6 +1393,21 @@ function drawCrowd(){
     g.fillStyle = '#4a3527'; g.fillRect(x+1, y-1, 5, 2);
   }
 }
+/* ===== 出发反应（v16）：听「嘟」再出发，抢跳两次 DQ ===== */
+function sgPrep(){
+  window._dqFlag = false;
+  _sg.phase = 'ready';
+  $('sgZone').style.visibility = 'hidden';
+  $('sgNeedle').style.visibility = 'hidden';
+  $('sgDots').textContent = '';
+  $('sgSub').textContent = '各就位——听到「嘟」再按「划水」';
+  _sg.goTimer = setTimeout(()=>{
+    _sg.phase = 'go';
+    _sg.t0 = performance.now();
+    sfx('beep');
+    $('sgSub').textContent = '嘟！出发！';
+  }, 1200 + Math.random()*2200);
+}
 function sgNext(){
   _sg.round++;
   const N = _sg.cfg.rounds || 8;
@@ -1413,6 +1431,35 @@ function sgNext(){
 }
 function sgTap(){
   if(!_sg || _sg.over) return;
+  if(_sg.phase === 'ready'){
+    clearTimeout(_sg.goTimer);
+    _sg.falseStarts++;
+    sfx('miss');
+    if(_sg.falseStarts >= 2){
+      window._dqFlag = true;
+      _sg.phase = 'swim';
+      $('sgDots').textContent = 'DQ';
+      $('sgSub').textContent = '两次抢跳——取消资格（DQ）';
+      setTimeout(sgFinish, 900);
+      return;
+    }
+    $('sgSub').textContent = '抢跳！召回重赛——再有一次就取消资格';
+    setTimeout(sgPrep, 900);
+    return;
+  }
+  if(_sg.phase === 'go'){
+    const rt = (performance.now() - _sg.t0) / 1000;
+    _sg.phase = 'swim';
+    $('sgZone').style.visibility = 'visible';
+    $('sgNeedle').style.visibility = 'visible';
+    if(rt < 0.22){ _sg.bonusHit = 1; sfx('hit'); }
+    else if(rt > 0.45){ _sg.bonusHit = -1; sfx('miss'); }
+    else { _sg.bonusHit = 0; }
+    $('sgDots').textContent = '出发 ' + rt.toFixed(2) + 's';
+    $('sgSub').textContent = '出发反应 '+rt.toFixed(2)+' 秒'+(_sg.bonusHit>0?'——快如离弦之箭，领先半个身位！':(_sg.bonusHit<0?'——慢了半拍，追吧。':''));
+    setTimeout(sgNext, 900);
+    return;
+  }
   const hit = _sg.pos >= _sg.zoneL && _sg.pos <= _sg.zoneL + _sg.zoneW;
   if(hit){ _sg.hits++; $('sgDots').textContent += '✓'; sfx('hit'); } else { $('sgDots').textContent += '×'; sfx('miss'); }
   sgNext();
@@ -1420,7 +1467,7 @@ function sgTap(){
 function sgFinish(){
   _sg.over = true;
   clearInterval(_sg.timer);
-  const hits = _sg.hits, done = _sg.done;
+  const hits = Math.max(0, _sg.hits + (_sg.bonusHit||0)), done = _sg.done;
   setTimeout(()=>{
     $('swimGame').classList.remove('on');
     $('sgDots').textContent = '';
@@ -1452,6 +1499,7 @@ function sfx(t){
              : t==='gift' ? [[784,'triangle',.07],[988,'triangle',.1]]
              : t==='coin' ? [[988,'square',.05],[1319,'square',.08]]
              : t==='chime'? [[659,'triangle',.08],[784,'triangle',.08],[1047,'triangle',.14]]
+             : t==='beep' ? [[1046,'square',.16]]
              : t==='sad'  ? [[330,'sine',.16],[247,'sine',.22]]
              : [];
     const vs = (S && S.volSfx!=null ? S.volSfx : 70) / 100;
@@ -1740,6 +1788,15 @@ function afterAction(kind){
     addLog('教练在走廊叫住你：队里要组 4x100 接力，让你挑三个伙伴。');
   }
   if(!S.over && S.relayDay && S.day >= S.relayDay){ S.relayDay = null; offerRelay(); }
+  // 训练间隙捡硬币
+  if(!S.over && (kind==='main'||kind==='tech'||kind==='strength') && Math.random()<0.08){
+    const c = 1 + R(3); S.coins = (S.coins||0) + c;
+    addLog('训练间隙在池边瓷砖缝里抠到 '+c+' 枚硬币。');
+  }
+  // 训练偶遇宿敌：憋气对决
+  if(!S.over && S.rival && (kind==='main'||kind==='tech'||kind==='strength') && Math.random()<0.06){
+    holdDuelStart(); save(); render(); return;
+  }
   if(S.over){ save(); render(); return; }
   randomEvent();
   fanMailTick();
@@ -2051,7 +2108,7 @@ function runMeetResult(tier, city, hits, fan){
   const bonus = hits*2 - 8;
   const w = strokeW();
   const mine = S.talent*w.talent + S.tech*w.tech + S.strength*w.strength + S.diligence*w.dil + (100-S.fatigue)*0.10 + R(14)-7 + bonus
-    + (S.suitBuff?12:0) + (fan?5:0) - (S.meetDistract?10:0);
+    + (S.suitBuff?12:0) + (fan?5:0) - (S.meetDistract?10:0) - (window._dqFlag?9999:0);
   if(S.suitBuff){ S.suitBuff=false; addLog('竞速泳衣贴身如肤，划水都利落了几分。', true); }
   S.meetDistract = false; S.sponsorAsked = false;
   let better = 0;
@@ -2062,9 +2119,9 @@ function runMeetResult(tier, city, hits, fan){
   const rank = better+1;
   if(rank===1){ S.goldStreak = (S.goldStreak||0)+1; } else { S.goldStreak = 0; }
   let medalTxt = '', rankTxt = '第'+rank+'名';
-  if(rank===1){ S.medals.gold++; medalTxt='🥇 金牌'; sfx('win'); }
-  else if(rank===2){ S.medals.silver++; medalTxt='🥈 银牌'; }
-  else if(rank===3){ S.medals.bronze++; medalTxt='🥉 铜牌'; }
+  if(rank===1){ S.medals.gold++; medalTxt='🥇 金牌'; sfx('win'); S.coins = (S.coins||0)+8; }
+  else if(rank===2){ S.medals.silver++; medalTxt='🥈 银牌'; S.coins = (S.coins||0)+5; }
+  else if(rank===3){ S.medals.bronze++; medalTxt='🥉 铜牌'; S.coins = (S.coins||0)+3; }
   S.meets.push({day:S.day, city, name:tier.name, rank});
   addLog(tier.name+' · 100米'+(strokeName()||'混合')+'（'+city+'）：'+rankTxt+(medalTxt?'，'+medalTxt:'')+'。', true);
   // 比赛纪念品：明信片带城市邮戳，其余通用品
@@ -2077,7 +2134,7 @@ function runMeetResult(tier, city, hits, fan){
   // 级别越高，认识的人越多
   const meetChances = S.trialIdx>=3 ? [0.65,0.5,0.4] : (S.trialIdx>=2 ? [0.65,0.45] : [0.65]);
   meetChances.forEach(ch=>{ if(Math.random() < ch){ const e = makeFriend(city); if(e) extra += e; } });
-  const bonusTxt = '<span style="font-size:12px;color:var(--ink-soft)">（划水节奏 '+hits+'/8，发挥'+(bonus>=0?'+':'')+bonus+'）</span>';
+  const bonusTxt = '<span style="font-size:12px;color:var(--ink-soft)">（划水节奏 '+hits+'/8，发挥'+(bonus>=0?'+':'')+bonus+(window._dqFlag?'；⚠ 抢跳两次，出发犯规':'')+'）</span>';
   showModal(tier.name+' · 100米'+(strokeName()||'混合'), city+'的泳池，八条泳道。<br><br>'+bonusTxt+'<br><br>'+S.name+'拿到了<b>'+rankTxt+'</b>'+(medalTxt?'，'+medalTxt:'')+'。'+(rank===1?mateNote(WIN_NOTES):'')+fanLine(fan, rank)+extra+rvExtra);
   drainRival();
   checkEndings();
@@ -2295,7 +2352,7 @@ function planeDayResult(hits, evId){
   const m = S.meet7;
   const bonus = hits*2 - 8;
   const st = m.st;
-  let mine = st.tech*0.45 + st.str*0.35 + (100-st.fat)*0.20 + R(14)-7 + bonus;
+  let mine = st.tech*0.45 + st.str*0.35 + (100-st.fat)*0.20 + R(14)-7 + bonus - (window._dqFlag?9999:0);
   const notes = [];
   if(S.suitBuff){ mine += 12; S.suitBuff=false; notes.push('竞速泳衣 +12'); }
   if(S.meetDistract){ mine -= 10; S.meetDistract=false; notes.push('逛摊分心 -10'); }
@@ -2312,7 +2369,7 @@ function planeDayResult(hits, evId){
   S.certs = (S.certs||0) + 1;
   let extra = fanLine(fan, rank);
   if(Math.random() < (m.intl?0.5:0.35)){ const e2 = makeFriend(m.city, m.intl); if(e2) extra += e2; }
-  const bonusTxt = '<span style="font-size:12px;color:var(--ink-soft)">（划水节奏 '+hits+'/8，发挥'+(bonus>=0?'+':'')+bonus+(notes.length?'；'+notes.join('，'):'')+'）</span>';
+  const bonusTxt = '<span style="font-size:12px;color:var(--ink-soft)">（划水节奏 '+hits+'/8，发挥'+(bonus>=0?'+':'')+bonus+(notes.length?'；'+notes.join('，'):'')+(window._dqFlag?'；⚠ 抢跳两次，出发犯规':'')+'）</span>';
   queueModal('决 赛 · 100米'+strokeNameOf(evId),
     m.city+'的看台坐满了人。八条泳道，一声哨响。<br><br>'+bonusTxt+'<br><br>'+S.name+'拿到<b>第'+rank+'名</b>，获颁一张<b>大赛证书</b>。'+extra+'<br><br><span style="font-size:12px;color:var(--ink-soft)">大赛单项只发证书；奖牌要看七天后的总排名。</span>',
     [{label:'去吃自助餐', cb:()=>planeBuffet()}]);
@@ -2358,9 +2415,9 @@ function endPlane(){
   const rank = better+1;
   if(rank===1){ S.goldStreak = (S.goldStreak||0)+1; } else { S.goldStreak = 0; }
   let medalTxt = '', rankTxt = '总排名第'+rank+'名';
-  if(rank===1){ S.medals.gold++; medalTxt='🥇 金牌'; sfx('win'); }
-  else if(rank===2){ S.medals.silver++; medalTxt='🥈 银牌'; }
-  else if(rank===3){ S.medals.bronze++; medalTxt='🥉 铜牌'; }
+  if(rank===1){ S.medals.gold++; medalTxt='🥇 金牌'; sfx('win'); S.coins = (S.coins||0)+8; }
+  else if(rank===2){ S.medals.silver++; medalTxt='🥈 银牌'; S.coins = (S.coins||0)+5; }
+  else if(rank===3){ S.medals.bronze++; medalTxt='🥉 铜牌'; S.coins = (S.coins||0)+3; }
   S.meets.push({day:S.day, city:m.city, name:m.name+'（七日）', rank});
   const rvExtra = rivalHook(m.name+'（七日）', m.city, rank, m.intl);
   addLog(m.name+'（'+m.city+'）七日赛程结束：单项 '+m.ranks.map(r=>'第'+r).join(' / ')+'，'+rankTxt+(medalTxt?'，'+medalTxt:'，与奖牌擦肩')+'，带走 3 张大赛证书。', true);
@@ -2486,7 +2543,7 @@ function runIntMeetResult(meet, city, country, rivals, hits, fan){
   const bonus = hits*2 - 8;
   const w = strokeW();
   const mine = S.talent*w.talent + S.tech*w.tech + S.strength*w.strength + S.diligence*w.dil + (100-S.fatigue)*0.10 + R(14)-7 + bonus
-    + (S.suitBuff?12:0) + (fan?5:0) - (S.meetDistract?10:0);
+    + (S.suitBuff?12:0) + (fan?5:0) - (S.meetDistract?10:0) - (window._dqFlag?9999:0);
   if(S.suitBuff){ S.suitBuff=false; addLog('竞速泳衣贴身如肤，划水都利落了几分。', true); }
   S.meetDistract = false;
   let better = 0;
@@ -2497,9 +2554,9 @@ function runIntMeetResult(meet, city, country, rivals, hits, fan){
   const rank = better+1;
   if(rank===1){ S.goldStreak = (S.goldStreak||0)+1; } else { S.goldStreak = 0; }
   let medalTxt = '', rankTxt = '第'+rank+'名';
-  if(rank===1){ S.medals.gold++; medalTxt='🥇 金牌'; sfx('win'); }
-  else if(rank===2){ S.medals.silver++; medalTxt='🥈 银牌'; }
-  else if(rank===3){ S.medals.bronze++; medalTxt='🥉 铜牌'; }
+  if(rank===1){ S.medals.gold++; medalTxt='🥇 金牌'; sfx('win'); S.coins = (S.coins||0)+8; }
+  else if(rank===2){ S.medals.silver++; medalTxt='🥈 银牌'; S.coins = (S.coins||0)+5; }
+  else if(rank===3){ S.medals.bronze++; medalTxt='🥉 铜牌'; S.coins = (S.coins||0)+3; }
   S.meets.push({day:S.day, city, name:meet+' · 国际', rank});
   addLog(meet+' · 100米'+(strokeName()||'混合')+'（'+city+'）：'+rankTxt+(medalTxt?'，'+medalTxt:'')+'。', true);
   if(Math.random() < 0.40) gainItem('card', city, country);
@@ -2510,7 +2567,7 @@ function runIntMeetResult(meet, city, country, rivals, hits, fan){
   const rvExtra = rivalHook(meet, city, rank, true);
   let extra = '';
   [0.8, 0.6, 0.4].forEach(ch=>{ if(Math.random() < ch){ const e = makeFriend(city, true); if(e) extra += e; } });
-  const bonusTxt = '<span style="font-size:12px;color:var(--ink-soft)">（划水节奏 '+hits+'/8，发挥'+(bonus>=0?'+':'')+bonus+'）</span>';
+  const bonusTxt = '<span style="font-size:12px;color:var(--ink-soft)">（划水节奏 '+hits+'/8，发挥'+(bonus>=0?'+':'')+bonus+(window._dqFlag?'；⚠ 抢跳两次，出发犯规':'')+'）</span>';
   showModal(meet+' · 100米'+(strokeName()||'混合'), city+'的水深比家里深。<br><br>'+bonusTxt+'<br><br>'+S.name+'拿到了<b>'+rankTxt+'</b>'+(medalTxt?'，'+medalTxt:'')+'。'+(rank===1?mateNote(WIN_NOTES):'')+fanLine(fan, rank)+extra+rvExtra);
   drainRival();
   if(meet==='奥运会' && rank===1){ forceEnd('champion'); }
@@ -2811,6 +2868,8 @@ function gainItem(id, place, country){
     const s = SOUVENIRS.find(x=>x.id===id);
     key=id; icon=s.icon; name=s.name; desc=s.desc;
   }
+  const wasDup = !!S.items[key];
+  if(wasDup) S.coins = (S.coins||0) + 5;
   S.items[key] = (S.items[key]||0)+1;
   let lit = '';
   if(place){
@@ -2818,7 +2877,7 @@ function gainItem(id, place, country){
     const dk = country || place;
     if(!S.dex[scope][dk]){ S.dex[scope][dk]=true; lit = ' · 图鉴点亮 '+(country||place); }
   }
-  addLog('拾到纪念品：'+icon+' '+name+'。', true);
+  addLog('拾到纪念品：'+icon+' '+name+'。'+(wasDup?'（重复 · 折 5 枚硬币）':''), true);
   toast(icon+' 获得 · '+name+lit);
   checkDexRewards();
 }
@@ -2955,6 +3014,7 @@ function load(){
   try{ const raw = localStorage.getItem(SAVE_KEY); if(raw){ S = JSON.parse(raw);
     if(S.chats===undefined) S.chats=0;
     if(S.swimX===undefined) S.swimX=0;
+  if(S.coins===undefined) S.coins = 0;
     if(S.laps===undefined) S.laps=0;
     if(!S.gender) S.gender='f';
     if(!S.items) S.items={};
@@ -3071,12 +3131,95 @@ function render(){
   renderGear();
   renderDex();
 }
+/* ===== 小卖部扭蛋机（v16）：硬币一抽，三款限定只有这里出 ===== */
+const GACHA_POOL = ['capGlow','trophyMini','badgeOld','card','doll','towel','bottle','pin','goggle','clip','cap','relay'];
+function openGacha(){
+  sfx('tap');
+  showModal('小 卖 部 · 扭 蛋 机',
+    '场馆小卖部角落的扭蛋机，玻璃罐里躺着十二款纪念品——其中三款只有这里出。<br><br>你的硬币：<b>'+(S.coins||0)+'</b> 枚（一抽 20 枚）<br><span style="font-size:12px;color:var(--ink-soft)">重复的纪念品自动折成 5 枚硬币；领奖台也有奖金。</span>',
+    [
+      {label:'投币扭一发（20）', cb:()=>{ gachaSpin(); }},
+      {label:'先攒攒', cb:()=>{}}
+    ]);
+}
+function gachaSpin(){
+  if((S.coins||0) < 20){ toast('硬币不够——重复纪念品和池边的硬币都能攒'); return; }
+  S.coins -= 20;
+  sfx('coin');
+  showModal('扭 蛋 机', '投币，旋钮吱呀吱呀……<br><br><span style="font-size:22px">🥚 咕噜咕噜……</span>', [{label:'……', cb:()=>{}}]);
+  setTimeout(()=>{
+    const id = pick(GACHA_POOL);
+    const dup = !!S.items[id];
+    if(dup){ S.coins += 5; }
+    sfx('gift');
+    gainItem(id);
+    const sv = SOUVENIRS.find(x=>x.id===id);
+    showModal('扭 蛋 开 出——',
+      '<div style="font-size:46px;margin:8px 0">'+sv.icon+'</div><div class="pcCap">'+sv.name+(dup?'（重复 · 折 5 枚硬币）':'（新品！）')+'</div><div class="hint">'+sv.desc+'</div><br>硬币剩余：<b>'+S.coins+'</b> 枚',
+      [{label:'再扭一发（20）', cb:()=>{ gachaSpin(); }},{label:'收好', cb:()=>{}}]);
+  }, 900);
+}
+/* ===== 和宿敌憋气（v16）：训练偶遇，1v1 三选一对决 ===== */
+let _hold = null;
+function holdDuelStart(){
+  _hold = {me:100, rv:100, round:1, log:''};
+  sfx('splash');
+  holdDuelShow();
+}
+function holdDuelShow(){
+  const rv = S.rival;
+  showModal('憋 气 对 决 · 第 '+_hold.round+' 回合',
+    '训练池里，'+rv.name+'恰好游进你隔壁泳道，冲你挑了挑眉。<br><br>'
+    +'<b>'+S.name+'</b> <span style="color:var(--accent);letter-spacing:1px">'+'●'.repeat(Math.round(_hold.me/10))+'</span> '+_hold.me+'<br>'
+    +'<b>'+rv.name+'</b> <span style="color:var(--ink-soft);letter-spacing:1px">'+'●'.repeat(Math.round(_hold.rv/10))+'</span> '+_hold.rv+'<br><br>'
+    +'<span style="font-size:12px;color:var(--ink-soft)">气先见底的人输。选你的招——</span>',
+    [
+      {label:'稳住', cb:()=>{ holdTurn('hold'); }},
+      {label:'压制', cb:()=>{ holdTurn('press'); }},
+      {label:'赌一把', cb:()=>{ holdTurn('gamble'); }}
+    ]);
+}
+function holdTurn(act){
+  let meD = 0, rvD = 0, say = '';
+  if(act==='hold'){ meD = 12; rvD = 10 + R(8); say = '你放慢呼吸，沉住气。'; }
+  else if(act==='press'){ meD = 20; rvD = 18 + R(8); say = '你贴着TA打腿，寸步不让。'; }
+  else{
+    if(Math.random()<0.5){ rvD = 30 + R(8); say = '你猛地一记变速，TA呛了一口水花！'; }
+    else { meD = 24 + R(6); say = '赌输了——你自己先乱了节奏。'; }
+  }
+  _hold.me = Math.max(0, _hold.me - meD);
+  _hold.rv = Math.max(0, _hold.rv - rvD);
+  _hold.round++;
+  if(_hold.rv <= 0 || _hold.me <= 0 || _hold.round > 6){
+    const win = _hold.rv <= 0 ? true : (_hold.me <= 0 ? false : (_hold.me === _hold.rv ? Math.random()<0.5 : _hold.me > _hold.rv));
+    holdEnd(win, say);
+    return;
+  }
+  _hold.log += say + '<br>';
+  holdDuelShow();
+}
+function holdEnd(win, lastSay){
+  const rv = S.rival;
+  let extra;
+  if(win){
+    S.trained += 5;
+    addLog('和'+rv.name+'比憋气，你赢了。（训练量 +5）', true);
+    extra = '「……服了，你今天是什么肺活量。」'+rv.name+'扶着池边直喘，「下次游真的。」<br><br><b>你赢了这场憋气对决。（训练量 +5）</b>';
+  } else {
+    if(S.rival) S.rival.pts = (S.rival.pts||0) + 2;
+    addLog('和'+rv.name+'比憋气，你先浮上来了。（'+rv.name+' 得意 +2）', true);
+    extra = '「就这？」'+rv.name+'探出头，甩了甩头发上的水，「回去练练，我还等着赢你呢。」<br><br><b>你输了这场憋气对决。（'+rv.name+' 得意 +2）</b>';
+  }
+  showModal('憋 气 对 决', _hold.log + lastSay + '<br><br>' + extra, [{label:'继续训练', cb:()=>{}}]);
+  save();
+}
 function renderGear(){
   if(!$('gearList')) return;
   const owned = GEAR.filter(g=>S.gear[g.id]);
-  $('gearList').innerHTML = owned.length
+  const gachaBtn = '<button class="pBtn" style="display:block;width:100%;max-width:320px;margin:0 auto 12px" onclick="openGacha()">🥚 扭蛋机 · 硬币 '+(S.coins||0)+' 枚</button>';
+  $('gearList').innerHTML = gachaBtn + (owned.length
     ? '<div class="itemGrid">'+owned.map(g=>'<div class="itemCard"><div class="ic">'+g.icon+'</div><div class="nm">'+g.name+' ×'+S.gear[g.id]+'</div><div class="ct">'+g.desc+'</div><button class="chatBtn" style="margin-top:10px" onclick="useGear(\''+g.id+'\')">使 用</button></div>').join('')+'</div>'
-    : '<div class="hint">还没有道具。比赛日场馆门口的赞助商摊位有售。</div>';
+    : '<div class="hint">还没有道具。比赛日场馆门口的赞助商摊位有售。</div><div class="hint" style="margin-top:8px">扭蛋机里的三款限定——夜光泳帽、迷你奖杯、初代队徽——只有那里出。</div>');
 }
 function useGear(id){
   if(!S.gear[id]) return;
@@ -3604,6 +3747,11 @@ function showHelp(){
       '每年生日，手账自动替你写一页「这一年」——训练量、奖牌、新朋友、和TA的交手账，收藏栏「年页」随时翻看',
       '疲惫拉满 100 累计 2 次后，今日安排会出现康复小屋：配合静养能消一次警报；偷偷下水加训练量，但三成概率加重伤情',
       '手账合上后的结算页，可以「翻到后来篇」——看看队友、好友和宿敌上岸之后都去了哪'
+    ])) +
+    H('🥚 出发 · 对决 · 扭蛋', L([
+      '每场比赛出发前：听到「嘟」再按「划水」——反应快半个身位；抢跳两次直接取消资格（DQ）',
+      '训练日可能偶遇宿敌同泳道：憋气对决，三招轮流出——赢了训练量 +5，输了TA得意 +2',
+      '比赛前三有奖金硬币，重复纪念品折 5 枚；攒够 20 枚去「道具」栏的扭蛋机——三款限定只有那里出'
     ])) +
     H('🏨 大赛周 · 七日位面', L([
       '省锦标赛及以上、全部国际赛走七日赛程，不占训练天数',
