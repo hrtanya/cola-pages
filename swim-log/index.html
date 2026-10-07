@@ -3353,16 +3353,14 @@ $('btnStart').onclick = ()=>{
   if(!name){ toast('先给TA取个名字吧'); return; }
   newGame(name, age, gender);
   render();
-  const d0 = S.traits.map(t=>TRAITS.find(x=>x.id===t));
-  const stg = ageStage();
-  showModal('开 营 日', '「'+name+'」入队了。<br><br>随机生成的性格特征：<br><b>'+d0[0].name+'</b> · '+d0[0].desc+'<br><b>'+d0[1].name+'</b> · '+d0[1].desc+'<br><br>年龄阶段：<b>'+stg.name+'</b> · '+stg.note);
-  queueModal('游 泳 馆 开 门 了',
+  /* 先问是否第一次玩：第一次玩→过完新手教程再揭示天赋；老朋友→直接看开营日 */
+  showModal('游 泳 馆 开 门 了',
     '清晨的泳池安安静静，水面还留着昨天的波纹。<br><br>你以前来过吗？',
     [
       {label:'第一次玩', cb:()=>{ sfx('page');
         showModal('新 手 指 引', '欢迎开始你的游泳生涯！<br><br>接下来用一分钟，带你认识这本手账。', [{label:'开 始', cb:()=>{ startTutorial(); }}]);
       }},
-      {label:'在水里留下过痕迹', cb:()=>{ sfx('splash'); S.tut = 'done'; save(); }}
+      {label:'在水里留下过痕迹', cb:()=>{ sfx('splash'); S.tut = 'done'; save(); campDayModal(); }}
     ]);
 };
 /* 有进行中的手账时，开新档先确认，防止误覆盖 */
@@ -3871,7 +3869,7 @@ function tutForward(attr){
   if(m) doAction(m[1]);
   queueModal('出 发 吧',
     '现在可以自由开始你的游泳生涯！<br><br>更详细的玩法说明，可点击右上角的 <b>⚙ 设置</b> 查看。',
-    [{label:'现 在 开 始 ！', cb:()=>{ setTimeout(showTutArrow, 350); }}]);
+    [{label:'现 在 开 始 ！', cb:()=>{ setTimeout(()=>{ showTutArrow(); campDayModal(); }, 350); }}]);
 }
 function tutCleanup(){
   _tut = null;
@@ -3883,6 +3881,11 @@ function tutCleanup(){
 function startTutorial(){
   S.tut = 0; save();
   tutShow(0);
+}
+function campDayModal(){
+  const d0 = S.traits.map(t=>TRAITS.find(x=>x.id===t));
+  const stg = ageStage();
+  showModal('开 营 日', '「'+S.name+'」入队了。<br><br>随机生成的性格特征：<br><b>'+d0[0].name+'</b> · '+d0[0].desc+'<br><b>'+d0[1].name+'</b> · '+d0[1].desc+'<br><br>年龄阶段：<b>'+stg.name+'</b> · '+stg.note);
 }
 function showTutArrow(){
   const b = $('btnSetting').getBoundingClientRect();
