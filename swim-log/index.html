@@ -224,6 +224,19 @@
   .dexReward{font-size:12px;color:var(--good);margin-top:16px;line-height:2;}
   .pcImg.pixImg{image-rendering:pixelated;}
 
+  /* ---------- 新手指引 ---------- */
+  #tutWrap{display:none;}
+  #tutWrap.on{display:block;}
+  #tutShade{position:fixed;inset:0;background:rgba(10,12,24,.45);z-index:70;}
+  #tutHi{position:fixed;z-index:71;display:none;border:2px solid rgba(174,229,242,.95);border-radius:12px;background:rgba(174,229,242,.08);box-shadow:0 0 0 4px rgba(174,229,242,.22), 0 0 26px rgba(174,229,242,.5);transition:all .25s;}
+  .tutHiM{position:fixed;z-index:71;border:2px solid rgba(174,229,242,.95);border-radius:12px;background:rgba(174,229,242,.10);box-shadow:0 0 0 4px rgba(174,229,242,.22), 0 0 26px rgba(174,229,242,.5);cursor:pointer;transition:all .25s;}
+  #tutWrap.on #tutHi{display:block;}
+  #tutTip{position:fixed;left:50%;bottom:8vh;transform:translateX(-50%);z-index:72;max-width:78vw;background:#fff;color:#2a2440;border-radius:14px;padding:14px 18px;font-size:13.5px;line-height:1.8;box-shadow:0 10px 30px rgba(10,12,30,.35);text-align:center;}
+  #tutTip .btn{margin-top:10px;background:#6b5f95;border-color:#6b5f95;color:#fff;}
+  #tutTip .btn:hover{background:#574e7d;}
+  #tutArrow{position:fixed;z-index:80;display:none;background:#fff;color:#2a2440;border-radius:10px;padding:9px 12px;font-size:12.5px;line-height:1.7;text-align:center;box-shadow:0 8px 22px rgba(10,12,30,.32);}
+  #tutArrow.on{display:block;animation:hintFloat 1.6s ease-in-out infinite;}
+
   /* ---------- 弹层 ---------- */
   #modal{
     position:fixed;inset:0;display:none;align-items:center;justify-content:center;
@@ -444,6 +457,8 @@
 <div id="swimGame"><div class="sgCard"><div class="sgTitle" id="sgTitle">决 赛 · 划 水 节 奏</div><div class="sgFan" id="sgFan"><canvas id="fanCv" width="60" height="14"></canvas><span id="sgFanName"></span></div><div class="sgSub" id="sgSub">在白线滑进绿色区域时按「划水」</div><div class="sgBar"><div class="sgZone" id="sgZone"></div><div class="sgCore"></div><div class="sgNeedle" id="sgNeedle"></div></div><button class="btn sgTap" id="sgTap" onclick="sgTap()">划 水 ！</button><div class="sgDots" id="sgDots"></div></div></div>
 <div id="plane"><div class="plCard"><div class="sgTitle" id="plTitle">大 赛 · 第 1 天 / 7</div><div id="plStats"></div><div id="plMapWrap"><canvas id="plMap" width="320" height="200" onclick="planeClick(event)" onmousemove="planeHover(event)" onmouseleave="planeHoverOut()"></canvas><div class="plLab" id="labPool">游 泳 馆</div><div class="plLab" id="labHotel">酒 店</div><div class="plLab" id="labPark">景 点</div><div id="plMapHint"></div></div><div id="plMsg"></div><div id="plBtns"></div></div></div>
 <div id="envWrap"><div class="envStage"><div class="envLetter" id="envLetter"></div><canvas id="envCv" width="64" height="48" onclick="envOpen()"></canvas><div class="envHint" id="envHint">点一下，拆开</div></div></div>
+<div id="tutWrap"><div id="tutShade"></div><div id="tutHi"></div><div id="tutTip"><div id="tutTipText"></div><button class="btn small" id="tutNext">下一步</button></div></div>
+<div id="tutArrow"></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -991,6 +1006,10 @@ const SOUVENIRS = [
 ];
 const GIFT_THANKS = ['这也太懂我了吧！','你怎么知道我缺这个！','收下了，比赛给你带好运','我要摆在书桌上天天看','下次我也带东西送你'];
 const SAVE_KEY = 'swimlog_save_v3';
+/* 结局图鉴跨存档记录：打出的结局永久点亮，换新档也不重新上锁 */
+const END_SEEN_KEY = 'swimlog_ends_v1';
+function seenEnds(){ try{ return JSON.parse(localStorage.getItem(END_SEEN_KEY)) || {}; }catch(e){ return {}; } }
+function seenEnd(id){ try{ const o = seenEnds(); if(!o[id]){ o[id] = true; localStorage.setItem(END_SEEN_KEY, JSON.stringify(o)); } }catch(e){} }
 /* 人物名册：国内每城 5 人，国际每国 10 人 */
 function buildRoster(){
   const roster = [];
@@ -1004,6 +1023,7 @@ function unlockEnding(id){
   S.endings = S.endings||{};
   if(S.endings[id]) return;
   S.endings[id] = true;
+  seenEnd(id);
   sfx('win');
   const e = ENDINGS.find(x=>x.id===id);
   addLog('达成结局「'+e.t+'」。', true);
@@ -2200,6 +2220,7 @@ function forceEnd(id, extraLine){
   const win = (id==='champion');
   sfx(win ? 'win' : 'sad');
   if(!S.endings[id]) S.endings[id] = true;
+  seenEnd(id);
   addLog('生涯结束——达成结局「'+ENDINGS.find(x=>x.id===id).t+'」。', true);
   recordHistory(id);
   save();
@@ -3023,6 +3044,7 @@ function load(){
     if(!S.buffDay) S.buffDay=0;
     if(!S.ach) S.ach = {};
     ACH.forEach(a=>{ if(S.endings && S.endings[a.id]) S.ach[a.id] = true; });
+    if(S.endings) Object.keys(S.endings).forEach(id=>seenEnd(id));
     if(!S.assess) S.assess = { next: S.day + 200, last: S.trained, streak: 0, fails: 0 };
     if(S.assess.streak===undefined) S.assess.streak = 0;
     if(S.assess.fails===undefined) S.assess.fails = 0;
@@ -3118,9 +3140,12 @@ function render(){
   $('meetList').innerHTML = S.meets.length
     ? S.meets.slice().reverse().map(m=>'<div class="meetItem">'+fmtD(m.day)+' · <b>'+m.name+'</b>（'+m.city+'）· '+m.rank+'名</div>').join('')
     : '<div class="hint">还没有比赛记录。</div>';
+  const _seen = seenEnds();
   $('endList').innerHTML = ENDINGS.map(e=>{
-    const got = S.endings[e.id];
-    return '<div class="meetItem" style="'+(got?'color:var(--good)':'opacity:.55')+'">'+(got?'🏆':'🔒')+' <b>'+e.t+'</b> · '+e.hint+'</div>';
+    const got = !!(_seen[e.id] || (S.endings && S.endings[e.id]));
+    return got
+      ? '<div class="meetItem" style="color:var(--good)">🏆 <b>'+e.t+'</b> · '+e.hint+'</div>'
+      : '<div class="meetItem" style="opacity:.6">🔒 <span style="filter:blur(4px);user-select:none"><b>'+e.t+'</b> · '+e.hint+'</span></div>';
   }).join('');
 
   const keys = Object.keys(S.items);
@@ -3331,6 +3356,14 @@ $('btnStart').onclick = ()=>{
   const d0 = S.traits.map(t=>TRAITS.find(x=>x.id===t));
   const stg = ageStage();
   showModal('开 营 日', '「'+name+'」入队了。<br><br>随机生成的性格特征：<br><b>'+d0[0].name+'</b> · '+d0[0].desc+'<br><b>'+d0[1].name+'</b> · '+d0[1].desc+'<br><br>年龄阶段：<b>'+stg.name+'</b> · '+stg.note);
+  queueModal('游 泳 馆 开 门 了',
+    '清晨的泳池安安静静，水面还留着昨天的波纹。<br><br>你以前来过吗？',
+    [
+      {label:'第一次玩', cb:()=>{ sfx('page');
+        showModal('新 手 指 引', '欢迎开始你的游泳生涯！<br><br>接下来用一分钟，带你认识这本手账。', [{label:'开 始', cb:()=>{ startTutorial(); }}]);
+      }},
+      {label:'在水里留下过痕迹', cb:()=>{ sfx('splash'); S.tut = 'done'; save(); }}
+    ]);
 };
 /* 有进行中的手账时，开新档先确认，防止误覆盖 */
 const _origBtnStart = $('btnStart').onclick;
@@ -3353,7 +3386,7 @@ $('btnReset').onclick = ()=>{
   if(confirm('确定要重新开始吗？当前手账会被撕掉。')) resetGame();
 };
 $('btnHistory').onclick = ()=>{ sfx('page'); showHistory(); };
-$('btnSetting').onclick = ()=>{ sfx('tap'); openSettings(); };
+$('btnSetting').onclick = ()=>{ sfx('tap'); $('tutArrow').classList.remove('on'); openSettings(); };
 $('btnRenameOk').onclick = ()=>{ sfx('tap'); doRename(); };
 $('btnSetClose').onclick = ()=>{ sfx('page'); $('setModal').classList.remove('on'); };
 $('btnSaveNow').onclick = ()=>{
@@ -3404,6 +3437,7 @@ function resumeGame(){
   render();
   if(S.over) showEndSummary();
   else if(S.meet7 && S.meet7.on) openPlane();
+  else if(typeof S.tut === 'number'){ setTimeout(()=>tutShow(S.tut), 350); }
 }
 /* 已结束的存档再次打开时，只重演结算页，不再触发新结局 */
 function showEndSummary(){
@@ -3764,12 +3798,111 @@ function showHelp(){
   );
 }
 
+/* ================= 新手指引 ================= */
+const TUT_TABS = [
+  ['log','手账','每天发生的事都会写在这里，随时可以回来翻。'],
+  ['friends','好友','比赛认识的朋友都在这里——聊天、送礼养好感，好友越多训练加成越高。'],
+  ['items','收藏','比赛和训练时捡到的明信片、纪念品都收在这里。'],
+  ['mail','信箱','粉丝的来信会寄到这里，记得读。'],
+  ['yearly','年页','每年过生日会收到一张年度总结，替你记下这一年。'],
+  ['gear','道具','赞助商装备和扭蛋机在这里——买装备会分心，但关键时刻能救命。'],
+  ['dex','房间','这是你的房间，奖牌和纪念品都可以摆上墙。'],
+  ['medals','战绩','比赛记录、奖牌数和结局图鉴都在这里。'],
+  ['ach','成就','解锁过的成就会永久点亮。']
+];
+let _tut = null;
+function tutAim(el, text, interactive){
+  const hi = $('tutHi');
+  $('tutTipText').textContent = text;
+  $('tutNext').style.display = interactive ? 'none' : '';
+  hi._target = interactive ? el : null;
+  hi.style.cursor = interactive ? 'pointer' : 'default';
+  const place = ()=>{
+    const r = el.getBoundingClientRect(), pad = 6;
+    hi.style.left = (r.left-pad)+'px'; hi.style.top = (r.top-pad)+'px';
+    hi.style.width = (r.width+pad*2)+'px'; hi.style.height = (r.height+pad*2)+'px';
+  };
+  place();
+  hi._place = place;
+  window.addEventListener('scroll', place, true);
+  window.addEventListener('resize', place);
+  hi.onclick = ()=>{ if(hi._target) tutForward(hi._target.getAttribute('onclick')||''); };
+}
+function tutAimFree(){
+  $('tutTipText').textContent = '来，自己试试——选一格，完成今天的安排。';
+  $('tutNext').style.display = 'none';
+  document.querySelectorAll('.act').forEach(b=>{
+    const box = document.createElement('div');
+    box.className = 'tutHiM';
+    const place = ()=>{
+      const r = b.getBoundingClientRect(), pad = 5;
+      box.style.left = (r.left-pad)+'px'; box.style.top = (r.top-pad)+'px';
+      box.style.width = (r.width+pad*2)+'px'; box.style.height = (r.height+pad*2)+'px';
+    };
+    place();
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    box._place = place;
+    box.onclick = ()=>{ tutForward(b.getAttribute('onclick')||''); };
+    $('tutWrap').appendChild(box);
+  });
+}
+function tutShow(step){
+  _tut = { step: step };
+  S.tut = step; save();
+  $('tutWrap').classList.add('on');
+  if(step === 0){
+    tutAim($('actions'), '这里是「今日安排」——每回合点击任意一格，就能完成当天的动作。', false);
+  }else if(step >= 1 && step <= TUT_TABS.length){
+    const t = TUT_TABS[step-1];
+    document.querySelector('.tab[data-tab="'+t[0]+'"]').click();
+    tutAim(document.querySelector('.tab[data-tab="'+t[0]+'"]'), '「'+t[1]+'」· '+t[2], false);
+  }else if(step === TUT_TABS.length + 1){
+    tutAimFree();
+  }
+}
+function tutNextStep(){ sfx('tap'); tutShow(_tut.step + 1); }
+function tutForward(attr){
+  if(!_tut) return;
+  tutCleanup();
+  S.tut = 'done'; save();
+  const m = (attr||'').match(/doAction\('([a-zA-Z]+)'\)/);
+  window._tutFinishing = true;
+  if(m) doAction(m[1]);
+  queueModal('出 发 吧',
+    '现在可以自由开始你的游泳生涯！<br><br>更详细的玩法说明，可点击右上角的 <b>⚙ 设置</b> 查看。',
+    [{label:'现 在 开 始 ！', cb:()=>{ setTimeout(showTutArrow, 350); }}]);
+}
+function tutCleanup(){
+  _tut = null;
+  $('tutWrap').classList.remove('on');
+  document.querySelectorAll('.tutHiM').forEach(b=>{ if(b._place){ window.removeEventListener('scroll', b._place, true); window.removeEventListener('resize', b._place); } b.remove(); });
+  const hi = $('tutHi');
+  if(hi._place){ window.removeEventListener('scroll', hi._place, true); window.removeEventListener('resize', hi._place); hi._place = null; hi._target = null; }
+}
+function startTutorial(){
+  S.tut = 0; save();
+  tutShow(0);
+}
+function showTutArrow(){
+  const b = $('btnSetting').getBoundingClientRect();
+  const a = $('tutArrow');
+  a.innerHTML = '更详细的玩法说明<br><b>点这里的 ⚙</b>';
+  a.style.top = (b.bottom + 8)+'px';
+  a.style.right = Math.max(8, window.innerWidth - b.right)+'px';
+  a.classList.add('on');
+  clearTimeout(showTutArrow._t);
+  showTutArrow._t = setTimeout(()=>a.classList.remove('on'), 6000);
+}
+$('tutNext').onclick = tutNextStep;
+
 /* ================= 启动 ================= */
 if(load()){
   laneP = S.swimX || 0; laneTarget = laneP;
   render();
   if(S.over){ showEndSummary(); }
   else if(S.meet7 && S.meet7.on){ openPlane(); }
+  else if(typeof S.tut === 'number'){ setTimeout(()=>tutShow(S.tut), 350); }
 }
 if(localStorage.getItem(SAVE_KEY)){ $('btnResume').style.display=''; $('btnAchHome').style.display=''; }
 /* 开门第一问：新客还是老朋友 */
@@ -3781,7 +3914,6 @@ function showStartAsk(){
       {label:'在水里留下过痕迹', cb:()=>{ sfx('splash'); }}
     ]);
 }
-showStartAsk();
 </script>
 </body>
 </html>
