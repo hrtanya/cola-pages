@@ -43,8 +43,12 @@
   .swatch{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid rgba(255,255,255,.25);transition:all .15s;padding:0;}
   .swatch.on{border-color:var(--accent);transform:scale(1.18);box-shadow:0 0 0 2px rgba(174,229,242,.35);}
   .laneRow{margin:14px 0 12px;position:relative;}
-  #laneTxt{position:absolute;right:6%;top:50%;transform:translateY(-50%);font-size:13px;letter-spacing:.14em;color:rgba(242,251,253,.75);pointer-events:none;white-space:nowrap;}
+  #laneTxt{position:absolute;left:6%;top:50%;transform:translateY(-50%);font-size:13px;letter-spacing:.14em;color:rgba(242,251,253,.75);pointer-events:none;white-space:nowrap;}
   #laneCv{display:block;width:100%;height:72px;image-rendering:pixelated;}
+  #laneGacha{position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;text-align:center;transition:transform .15s;z-index:2;}
+  #laneGacha:hover{transform:translateY(-50%) scale(1.1);}
+  #laneGacha canvas{width:44px;height:56px;image-rendering:pixelated;display:block;margin:0 auto;filter:drop-shadow(0 1px 2px rgba(20,40,60,.25));}
+  #laneGacha .lbl{font-size:11px;font-weight:700;letter-spacing:.2em;color:rgba(255,255,255,.95);margin-bottom:2px;text-shadow:0 1px 3px rgba(15,35,55,.85), 0 0 4px rgba(15,35,55,.5);}
   .wrap{max-width:680px;margin:0 auto;padding:48px 24px 96px;position:relative;z-index:1;}
 
   /* ---------- 创建页 ---------- */
@@ -2427,10 +2431,11 @@ function planeEat(d){
 }
 function endPlane(){
   const m = S.meet7;
-  const total = m.ranks.reduce((a,b)=>a+b, 0);
+  const total = m.ranks.reduce((a,b)=>a+b, 0); // 自己三个单项的名次和，越小越好
   let better = 0;
   for(let i=0;i<7;i++){
-    const rt = (m.rivals[0] + Math.random()*(m.rivals[1]-m.rivals[0]))*3;
+    let rt = 0;                                  // 对手也打三个单项：名次和比较，量纲一致
+    for(let k=0;k<3;k++) rt += 1 + R(8);
     if(rt < total) better++;
   }
   const rank = better+1;
@@ -2608,9 +2613,33 @@ const SCALE = 2;
 function px(x,y,w,h,c){ cx.fillStyle=c; cx.fillRect(Math.round(x)*SCALE, Math.round(y)*SCALE, w*SCALE, h*SCALE); }
 const laneTxt = document.createElement('div');
 laneTxt.id = 'laneTxt';
+/* 泳道旁的扭蛋机贴纸：像素小机器，点击开抽 */
+const gachCv = document.createElement('canvas');
+gachCv.width = 11; gachCv.height = 14;
+const gx = gachCv.getContext('2d');
+function gpx(x,y,w,h,c){ gx.fillStyle=c; gx.fillRect(x,y,w,h); }
+gpx(2,0,7,6,'#bfe3ee');   // 玻璃罩
+gpx(3,1,2,2,'#e8798a');   // 罩里的彩球
+gpx(6,2,2,2,'#e6b45a');
+gpx(4,4,3,1,'#ffffff');   // 高光
+gpx(1,5,9,1,'#c04a4a');   // 罩沿
+gpx(1,6,9,7,'#d65a5a');   // 红机身
+gpx(4,8,3,2,'#7a4a2b');   // 出球口
+gpx(8,9,1,2,'#4a3b26');   // 投币口
+gpx(1,13,9,1,'#a03e3e');  // 底座
+gpx(2,6,2,5,'rgba(255,255,255,.18)'); // 机身高光
+const gachWrap = document.createElement('div');
+gachWrap.id = 'laneGacha';
+const gachLbl = document.createElement('div'); gachLbl.className='lbl'; gachLbl.textContent='扭蛋机';
+gachWrap.appendChild(gachLbl); gachWrap.appendChild(gachCv);
+gachWrap.onclick = ()=>{ if(S && typeof openGacha==='function'){ sfx('page'); openGacha(); } };
 function attachLane(){
   const row = document.getElementById('laneRow');
-  if(row && cv.parentElement !== row){ row.innerHTML=''; row.appendChild(cv); row.appendChild(laneTxt); }
+  if(row && cv.parentElement !== row){
+    row.innerHTML=''; row.appendChild(cv); row.appendChild(laneTxt);
+    gachWrap.title = '小卖部扭蛋机 · 硬币 '+((S && S.coins) || 0)+' 枚（一抽 20 枚）';
+    row.appendChild(gachWrap);
+  }
 }
 function setLaneTxt(t){
   if(laneTxt.textContent !== t) laneTxt.textContent = t;
@@ -3194,14 +3223,14 @@ function holdDuelStart(){
 function holdDuelShow(){
   const rv = S.rival;
   showModal('憋 气 对 决 · 第 '+_hold.round+' 回合',
-    '训练池里，'+rv.name+'恰好游进你隔壁泳道，冲你挑了挑眉。<br><br>'
+    '训练池里，'+rv.name+'恰好游进你隔壁泳道，冲你挑了挑眉——比憋气，谁的气先见底谁输。<br><br>'
     +'<b>'+S.name+'</b> <span style="color:var(--accent);letter-spacing:1px">'+'●'.repeat(Math.round(_hold.me/10))+'</span> '+_hold.me+'<br>'
     +'<b>'+rv.name+'</b> <span style="color:var(--ink-soft);letter-spacing:1px">'+'●'.repeat(Math.round(_hold.rv/10))+'</span> '+_hold.rv+'<br><br>'
-    +'<span style="font-size:12px;color:var(--ink-soft)">气先见底的人输。选你的招——</span>',
+    +'<span style="font-size:12px;color:var(--ink-soft)">三招各有路数——「匀息」最稳，自己省气、磨掉TA一点；「逼近」两边都耗得多，但压得住阵脚；「变速」是赌：五五开，要么TA大咙一口水，要么你自己先乱节奏。</span>',
     [
-      {label:'稳住', cb:()=>{ holdTurn('hold'); }},
-      {label:'压制', cb:()=>{ holdTurn('press'); }},
-      {label:'赌一把', cb:()=>{ holdTurn('gamble'); }}
+      {label:'匀 息', cb:()=>{ holdTurn('hold'); }},
+      {label:'逼 近', cb:()=>{ holdTurn('press'); }},
+      {label:'变 速', cb:()=>{ holdTurn('gamble'); }}
     ]);
 }
 function holdTurn(act){
@@ -3241,10 +3270,10 @@ function holdEnd(win, lastSay){
 function renderGear(){
   if(!$('gearList')) return;
   const owned = GEAR.filter(g=>S.gear[g.id]);
-  const gachaBtn = '<button class="pBtn" style="display:block;width:100%;max-width:320px;margin:0 auto 12px" onclick="openGacha()">🥚 扭蛋机 · 硬币 '+(S.coins||0)+' 枚</button>';
-  $('gearList').innerHTML = gachaBtn + (owned.length
+  $('gearList').innerHTML = (owned.length
     ? '<div class="itemGrid">'+owned.map(g=>'<div class="itemCard"><div class="ic">'+g.icon+'</div><div class="nm">'+g.name+' ×'+S.gear[g.id]+'</div><div class="ct">'+g.desc+'</div><button class="chatBtn" style="margin-top:10px" onclick="useGear(\''+g.id+'\')">使 用</button></div>').join('')+'</div>'
-    : '<div class="hint">还没有道具。比赛日场馆门口的赞助商摊位有售。</div><div class="hint" style="margin-top:8px">扭蛋机里的三款限定——夜光泳帽、迷你奖杯、初代队徽——只有那里出。</div>');
+    : '<div class="hint">还没有道具。比赛日场馆门口的赞助商摊位有售。</div>')
+    + '<div class="hint" style="margin-top:8px">泳道旁立着一台扭蛋机——三款限定（夜光泳帽、迷你奖杯、初代队徽）只有那里出。</div>';
 }
 function useGear(id){
   if(!S.gear[id]) return;
@@ -3782,8 +3811,8 @@ function showHelp(){
     ])) +
     H('🥚 出发 · 对决 · 扭蛋', L([
       '每场比赛出发前：听到「嘟」再按「划水」——反应快半个身位；抢跳两次直接取消资格（DQ）',
-      '训练日可能偶遇宿敌同泳道：憋气对决，三招轮流出——赢了训练量 +5，输了TA得意 +2',
-      '比赛前三有奖金硬币，重复纪念品折 5 枚；攒够 20 枚去「道具」栏的扭蛋机——三款限定只有那里出'
+      '训练日可能偶遇宿敌同泳道：憋气对决（匀息 / 逼近 / 变速），赢了训练量 +5，输了TA得意 +2',
+      '比赛前三有奖金硬币，重复纪念品折 5 枚；攒够 20 枚，点泳道旁的扭蛋机贴纸开抽——三款限定只有那里出'
     ])) +
     H('🏨 大赛周 · 七日位面', L([
       '省锦标赛及以上、全部国际赛走七日赛程，不占训练天数',
@@ -3803,7 +3832,7 @@ const TUT_TABS = [
   ['items','收藏','比赛和训练时捡到的明信片、纪念品都收在这里。'],
   ['mail','信箱','粉丝的来信会寄到这里，记得读。'],
   ['yearly','年页','每年过生日会收到一张年度总结，替你记下这一年。'],
-  ['gear','道具','赞助商装备和扭蛋机在这里——买装备会分心，但关键时刻能救命。'],
+  ['gear','道具','赞助商装备在这里——买装备会分心，但关键时刻能救命。'],
   ['dex','房间','这是你的房间，奖牌和纪念品都可以摆上墙。'],
   ['medals','战绩','比赛记录、奖牌数和结局图鉴都在这里。'],
   ['ach','成就','解锁过的成就会永久点亮。']
