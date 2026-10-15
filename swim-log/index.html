@@ -323,6 +323,23 @@
   .sgNeedle{position:absolute;top:-5px;bottom:-5px;width:3px;background:#fff;border-radius:2px;box-shadow:0 0 8px rgba(255,255,255,.8);}
   .sgTap{width:100%;margin-top:18px;}
   .sgDots{margin-top:14px;font-size:16px;letter-spacing:6px;min-height:22px;color:#fff;}
+  .sgBurst{background:#d65a5a !important;border-color:#d65a5a !important;}
+  #sgStam{margin:10px 0 2px;}
+  .sgStamRow{display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(255,255,255,.85);}
+  .sgStamLb{letter-spacing:.2em;}
+  .sgStamBar{flex:1;height:8px;border-radius:99px;background:rgba(255,255,255,.18);overflow:hidden;}
+  .sgStamBar i{display:block;height:100%;border-radius:99px;background:#5aa8cc;transition:width .25s, background .25s;}
+  #sgStamTip{min-width:88px;text-align:right;color:#ffe9b8;}
+  #pbWrap{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(4,20,30,.82);z-index:58;cursor:pointer;}
+  #pbWrap.on{display:flex;}
+  .pbCard{text-align:center;color:#fff;padding:30px 40px;border-radius:18px;background:rgba(8,44,62,.9);border:1px solid rgba(255,255,255,.18);box-shadow:0 18px 60px rgba(0,0,0,.5);}
+  .pbTag{font-size:12px;letter-spacing:.5em;color:#ffe9b8;margin-bottom:8px;}
+  .pbEv{font-size:15px;letter-spacing:.15em;color:rgba(255,255,255,.85);margin-bottom:14px;}
+  .pbClock{font-size:64px;font-weight:700;letter-spacing:.04em;font-variant-numeric:tabular-nums;color:#fff;text-shadow:0 0 24px rgba(126,231,205,.55);}
+  #pbWrap.frozen .pbClock{color:#7ee7cd;}
+  .pbOld{margin-top:14px;font-size:14px;color:rgba(255,255,255,.9);}
+  .pbSeg{margin-top:6px;font-size:13px;color:rgba(255,255,255,.7);}
+  .pbHint{margin-top:18px;font-size:12px;color:rgba(255,255,255,.5);letter-spacing:.2em;}
   .sgFan{display:none;align-items:center;justify-content:center;gap:10px;margin-bottom:12px;font-size:12px;color:#ffe9b8;}
   #fanCv{image-rendering:pixelated;width:180px;height:42px;}
 
@@ -442,6 +459,8 @@
       </div>
       <div class="secTitle">比 赛 记 录</div>
       <div id="meetList"></div>
+      <div class="secTitle" style="margin-top:26px">生 涯 之 最</div>
+      <div id="pbList"></div>
       <div class="secTitle" style="margin-top:26px">结 局</div>
       <div id="endList"></div>
     </div>
@@ -470,7 +489,7 @@
   </div>
 </div></div>
 <div id="modal"><div class="modalCard"><div class="mt" id="mdTitle"></div><div class="mb" id="mdBody"></div><div id="mdBtns"></div></div></div>
-<div id="swimGame"><div class="sgCard"><div class="sgTitle" id="sgTitle">决 赛 · 划 水 节 奏</div><div class="sgFan" id="sgFan"><canvas id="fanCv" width="60" height="14"></canvas><span id="sgFanName"></span></div><div class="sgSub" id="sgSub">在白线滑进绿色区域时按「划水」</div><div class="sgBar"><div class="sgZone" id="sgZone"></div><div class="sgCore"></div><div class="sgNeedle" id="sgNeedle"></div></div><button class="btn sgTap" id="sgTap" onclick="sgTap()">划 水 ！</button><div class="sgDots" id="sgDots"></div></div></div>
+<div id="swimGame"><div class="sgCard"><div class="sgTitle" id="sgTitle">决 赛 · 划 水 节 奏</div><div class="sgFan" id="sgFan"><canvas id="fanCv" width="60" height="14"></canvas><span id="sgFanName"></span></div><div class="sgSub" id="sgSub">在白线滑进绿色区域时按「划水」</div><div class="sgBar"><div class="sgZone" id="sgZone"></div><div class="sgCore"></div><div class="sgNeedle" id="sgNeedle"></div></div><button class="btn sgTap" id="sgTap" onclick="sgTap()">划 水 ！</button><button class="btn sgBurst" id="sgBurst" onclick="sgBurst()" style="display:none">冲 一 拍 ！</button><div class="sgDots" id="sgDots"></div></div></div>
 <div id="plane"><div class="plCard"><div class="sgTitle" id="plTitle">大 赛 · 第 1 天 / 7</div><div id="plStats"></div><div id="plMapWrap"><canvas id="plMap" width="320" height="200" onclick="planeClick(event)" onmousemove="planeHover(event)" onmouseleave="planeHoverOut()"></canvas><div class="plLab" id="labPool">游 泳 馆</div><div class="plLab" id="labHotel">酒 店</div><div class="plLab" id="labPark">景 点</div><div id="plMapHint"></div></div><div id="plMsg"></div><div id="plBtns"></div></div></div>
 <div id="envWrap"><div class="envStage"><div class="envLetter" id="envLetter"></div><canvas id="envCv" width="64" height="48" onclick="envOpen()"></canvas><div class="envHint" id="envHint">点一下，拆开</div></div></div>
 <div id="tutWrap"><div id="tutShade"></div><div id="tutHi"></div><div id="tutTip"><div id="tutTipText"></div><button class="btn small" id="tutNext">下一步</button></div></div>
@@ -479,6 +498,20 @@
 <div id="achToast"></div>
 
 <script>
+/* 沙箱兜底：机核等平台会把游戏放进禁用 localStorage 的 iframe，探测失败就换成内存存储，保证开局链路完整 */
+(function(){
+  try{ localStorage.getItem('__probe'); return; }catch(e){}
+  var mem = {};
+  var shim = {
+    getItem: function(k){ return Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null; },
+    setItem: function(k, v){ mem[k] = String(v); },
+    removeItem: function(k){ delete mem[k]; },
+    key: function(i){ var ks = Object.keys(mem); return i < ks.length ? ks[i] : null; },
+    clear: function(){ mem = {}; },
+    get length(){ return Object.keys(mem).length; }
+  };
+  try{ Object.defineProperty(window, 'localStorage', { get: function(){ return shim; }, configurable: true }); }catch(e2){}
+})();
 /* ================= 数据 ================= */
 const TRAITS = [
   {id:'zl', name:'自律',   desc:'训练更勤奋（勤奋+15），但不肯休息，恢复变慢（休息效果-20%）'},
@@ -528,7 +561,8 @@ const ACH = [
   {id:'veteran', t:'常青树',       hint:'累计参加 30 场比赛'},
   {id:'rival', t:'亦敌亦友', hint:'与宿敌交锋 10 场'},
   {id:'bond',  t:'惺惺相惜', hint:'把宿敌处成交情满格（100）'},
-  {id:'mail',  t:'纸短情长', hint:'收到 15 封粉丝来信'}
+  {id:'mail',  t:'纸短情长', hint:'收到 15 封粉丝来信'},
+  {id:'wavebreaker', t:'破浪者', hint:'累计打破 5 次个人最好成绩（隐藏）'}
 ];
 /* ===== 宿敌线（v13） ===== */
 let _rvQueue = [];
@@ -937,6 +971,52 @@ const STROKES = [
   {id:'back',   name:'仰泳',   desc:'水感细腻，勤奋复利', w:{talent:.25, tech:.30, strength:.10, dil:.35}}
 ];
 const BASE_W = {talent:.35, tech:.30, strength:.15, dil:.10};
+/* ===== 纪录时刻（v18）：PB 追踪 + 慢放定格 + 印章 ===== */
+function pbOf(strokeId){ return (S.pb && S.pb[strokeId]) || null; }
+function scoreToTime(mine){
+  /* 发挥分越高，秒数越短：60 分约 1:08，100 分以上逼近 54 秒 */
+  const t = 74 - Math.max(-20, (mine - 60)) * 0.155 + Math.random()*0.6;
+  return Math.max(53.5, Math.round(t*10)/10);
+}
+function fmtTime(t){
+  const m = Math.floor(t/60), s = (t - m*60).toFixed(1);
+  return (m>0 ? m+'′' : '') + (m>0 && s<10 ? '0' : '') + s + '″';
+}
+function pbCheck(strokeId, evName, t, showSeg, done){
+  S.pb = S.pb || {};
+  const cur = S.pb[strokeId];
+  if(!cur){ S.pb[strokeId] = {t:t, day:S.day, count:0, stamps:[]}; return false; }
+  if(t < cur.t){
+    cur.count = (cur.count||0) + 1;
+    cur.stamps = cur.stamps || [];
+    cur.stamps.push({day:S.day, name:evName, t:t});
+    const old = cur.t; cur.t = t; cur.day = S.day;
+    pbShow(evName, old, t, showSeg, done);
+    return true;
+  }
+  return false;
+}
+function pbShow(evName, oldT, newT, showSeg, done){
+  sfx('win');
+  let wrap = document.getElementById('pbWrap');
+  if(!wrap){
+    wrap = document.createElement('div'); wrap.id = 'pbWrap';
+    wrap.innerHTML = '<div class="pbCard"><div class="pbTag">R E C O R D</div><div class="pbEv"></div><div class="pbClock" id="pbClock">--</div><div class="pbOld"></div><div class="pbSeg"></div><div class="pbHint">点击定格这一秒</div></div>';
+    document.body.appendChild(wrap);
+  }
+  wrap.querySelector('.pbEv').textContent = evName + ' · ' + S.name;
+  wrap.querySelector('.pbOld').innerHTML = '原纪录 <b>'+fmtTime(oldT)+'</b> → 新纪录 <b style="color:#ffe9b8">'+fmtTime(newT)+'</b>，快了 '+(oldT-newT).toFixed(1)+' 秒';
+  wrap.querySelector('.pbSeg').innerHTML = showSeg || '';
+  wrap.classList.add('on');
+  const clock = wrap.querySelector('#pbClock');
+  let v = oldT + 2;
+  const iv = setInterval(()=>{
+    v -= 0.35;
+    if(v <= newT){ v = newT; clearInterval(iv); wrap.classList.add('frozen'); }
+    clock.textContent = fmtTime(v);
+  }, 55);
+  wrap.onclick = ()=>{ if(v > newT) return; wrap.classList.remove('on','frozen'); if(done) done(); };
+}
 function strokeW(){
   if(!S.stroke) return BASE_W;
   const st = STROKES.find(x=>x.id===S.stroke);
@@ -1164,6 +1244,7 @@ function checkEndings(){
   if(S.rival && (S.rival.h2h.w + S.rival.h2h.l) >= 10) unlockAch('rival');
   if(S.rival && (S.rival.pts||0) >= 100) unlockAch('bond');
   if(S.mail && S.mail.letters.length >= 15) unlockAch('mail');
+  if(Object.keys(S.pb||{}).length && Object.values(S.pb).reduce((a,p)=>a+(p.count||0),0) >= 5) unlockAch('wavebreaker');
 }
 
 /* ================= 状态 ================= */
@@ -1408,8 +1489,48 @@ function openSwimGame(done, cfg){
   if(cfg.fan){ fanBox.style.display = 'flex'; $('sgFanName').textContent = '看台上 · '+cfg.fan.name+' 来看你了'; drawCrowd(); }
   else fanBox.style.display = 'none';
   $('swimGame').classList.add('on');
-  _sg = { done, hits:0, round:0, pos:0, dir:1, zoneL:0, zoneW:0, timer:null, over:false, cfg, phase:'swim', bonusHit:0, falseStarts:0, goTimer:null, t0:0 };
+  /* 前程后程（省锦标赛及以上启用）：体力条 + 冲一拍 + 冲刺模式 */
+  const tiered = (cfg.tIdx !== undefined) && cfg.tIdx >= 1;
+  _sg = { done, hits:0, round:0, pos:0, dir:1, zoneL:0, zoneW:0, timer:null, over:false, cfg, phase:'swim', bonusHit:0, falseStarts:0, goTimer:null, t0:0,
+          paceOn: tiered, stam:100, sprint:false, burstUsed:0, seg1:[], seg2:[], paceEls:null };
+  if(tiered) sgPaceUI();
+  $('sgBurst').style.display = tiered ? '' : 'none';
   sgPrep();
+}
+/* 体力条 UI：挂在泳道小游戏面板上 */
+function sgPaceUI(){
+  const box = $('sgBody') || $('sgDots').parentElement;
+  let bar = document.getElementById('sgStam');
+  if(!bar){
+    bar = document.createElement('div'); bar.id = 'sgStam';
+    bar.innerHTML = '<div class="sgStamRow"><span class="sgStamLb">体力</span><span class="sgStamBar"><i id="sgStamFill"></i></span><span id="sgStamTip"></span></div>';
+    box.insertBefore(bar, box.firstChild);
+  }
+  sgStamPaint();
+}
+function sgStamPaint(){
+  const fill = document.getElementById('sgStamFill'), tip = document.getElementById('sgStamTip');
+  if(!fill) return;
+  fill.style.width = Math.max(0, _sg.stam) + '%';
+  fill.style.background = _sg.stam > 55 ? '#5aa8cc' : (_sg.stam > 35 ? '#e6b45a' : '#d65a5a');
+  const n = _sg.round;
+  tip.textContent = n <= 4 ? '前程' : (n <= 6 ? '后程' : '冲刺');
+}
+function sgBurst(){
+  if(!_sg || _sg.over || !_sg.paceOn) return;
+  if(_sg.phase !== 'swim' || _sg.round === 0 || _sg.round > 4) return;
+  if(_sg.stam < 25){ $('sgStamTip').textContent = '体力不够冲了！'; return; }
+  _sg.burstNext = true;
+  $('sgStamTip').textContent = '下一拍冲起来！';
+}
+function sgBurstVis(){
+  const b = $('sgBurst'); if(!b) return;
+  b.style.display = (_sg && _sg.paceOn && _sg.phase==='swim' && _sg.round>=1 && _sg.round<=4) ? '' : 'none';
+}
+function sgSegTime(round, hit){
+  /* 分段秒数：基础节奏 - 命中奖励 - 冲刺奖励，随机扰动 */
+  const base = 7.45 - (hit?0.06:0) - (_sg.sprint&&round>=7 ? 0.09 : 0) - (_sg.burstHit&&round===_sg.lastBurstRound ? 0.10 : 0);
+  return Math.max(6.9, base - Math.random()*0.25);
 }
 /* 好友像素头像：发型/肤色/衣服按序号错开 */
 function drawFriendAvatar(el, f, i){
@@ -1463,12 +1584,19 @@ function sgNext(){
   _sg.round++;
   const N = _sg.cfg.rounds || 8;
   if(_sg.round > N){ sgFinish(); return; }
-  const zw = Math.max(10, 22 - _sg.round*1.5);
+  let zw = Math.max(10, 22 - _sg.round*1.5);
+  /* 前程后程：冲刺模式判定圈放宽，抽干体力则收紧 */
+  if(_sg.paceOn){
+    if(_sg.round === 5){ _sg.sprint = _sg.stam >= 40; if(_sg.sprint) $('sgStamTip').textContent = '还有体力——最后几轮冲起来了！'; else $('sgStamTip').textContent = '前程冲太狠了，后程没油了……'; }
+    if(_sg.sprint && _sg.round >= 7) zw *= 1.4;
+    else if(!_sg.sprint && _sg.round >= 5) zw *= 0.8;
+  }
   _sg.zoneW = zw;
   _sg.zoneL = 15 + Math.random()*(70-zw);
   $('sgZone').style.left = _sg.zoneL+'%';
   $('sgZone').style.width = zw+'%';
-  $('sgSub').textContent = '第 '+_sg.round+'/'+N+' 下 · 白线滑进绿区时按「划水」';
+  $('sgSub').textContent = '第 '+_sg.round+'/'+N+' 下 · 白线滑进绿区时按「划水」'+(_sg.paceOn && _sg.round===1 ? '（前程可点「冲一拍」换高分）' : '');
+  sgBurstVis();
   $('sgNeedle').style.left = '0%';
   _sg.pos = 0; _sg.dir = 1;
   const speed = (_sg.cfg.speedBase||1.15) + _sg.round*(_sg.cfg.speedInc||0.28);
@@ -1512,6 +1640,15 @@ function sgTap(){
     return;
   }
   const hit = _sg.pos >= _sg.zoneL && _sg.pos <= _sg.zoneL + _sg.zoneW;
+  if(_sg.paceOn){
+    /* 体力结算：普通一拍 -10；冲一拍 -30 但分数翻倍计；分段计时 */
+    const burst = !!_sg.burstNext; _sg.burstNext = false;
+    _sg.stam = Math.max(0, _sg.stam - (burst ? 30 : 10));
+    if(burst && hit){ _sg.hits += 2; _sg.lastBurstRound = _sg.round; _sg.burstHit = true; }
+    else _sg.burstHit = false;
+    if(_sg.round <= 4) _sg.seg1.push(sgSegTime(_sg.round, hit)); else _sg.seg2.push(sgSegTime(_sg.round, hit));
+    sgStamPaint();
+  }
   if(hit){ _sg.hits++; $('sgDots').textContent += '✓'; sfx('hit'); } else { $('sgDots').textContent += '×'; sfx('miss'); }
   sgNext();
 }
@@ -1519,12 +1656,21 @@ function sgFinish(){
   _sg.over = true;
   clearInterval(_sg.timer);
   const hits = Math.max(0, _sg.hits + (_sg.bonusHit||0)), done = _sg.done;
+  /* 前程后程：两段分段秒数 + 命中数一起传给结算方 */
+  const pace = _sg.paceOn ? {
+    seg1: _sg.seg1.reduce((a,b)=>a+b, 0),
+    seg2: _sg.seg2.reduce((a,b)=>a+b, 0),
+    stam: _sg.stam,
+    sprint: _sg.sprint,
+    bursts: _sg.seg1.length > 0 ? Math.max(0, _sg.hits - (_sg.seg1.length+_sg.seg2.length)) : 0
+  } : null;
   setTimeout(()=>{
     $('swimGame').classList.remove('on');
     $('sgDots').textContent = '';
     $('sgFan').style.display = 'none';
+    const st = document.getElementById('sgStam'); if(st) st.remove();
     _sg = null;
-    done(hits);
+    done(hits, pace);
   }, 500);
 }
 document.addEventListener('keydown', e=>{
@@ -2126,7 +2272,7 @@ function offerMeet(){
   }
 }
 function goMeet(tier, tIdx, city){
-  if(tIdx >= 1){ startMeetPlane(tier, tIdx, city, {}); } else { runMeet(tier, city); }
+  if(tIdx >= 1){ startMeetPlane(tier, tIdx, city, {}); } else { runMeet(tier, tIdx, city); }
 }
 /* 赞助商摊位：去了赛场才有概率遇到；买道具有代价（本场比赛发挥 -10） */
 function offerSponsor(tier, tIdx, city){
@@ -2140,11 +2286,11 @@ function offerSponsor(tier, tIdx, city){
       {label:'什么都不买', cb:()=>{ addLog('从赞助商摊位前走过，稳了稳心神。'); goMeet(tier, tIdx, city); }}
     ]);
 }
-function runMeet(tier, city){
+function runMeet(tier, tIdx, city){
   S.meetDay = null;
   const closeFs = S.friends.filter(f=>(f.stage||0)>=3);
   const fan = closeFs.length ? pick(closeFs) : ((S.friends.length && Math.random()<0.5) ? pick(S.friends) : null);
-  openSwimGame(hits=>runMeetResult(tier, city, hits, fan), {rounds:8});
+  openSwimGame((hits, pace)=>runMeetResult(tier, city, hits, fan, pace), {rounds:8, tIdx:tIdx});
 }
 /* 好友到场观赛：赛后一句台词，好感 +1 */
 function fanLine(fan, rank){
@@ -2155,7 +2301,7 @@ function fanLine(fan, rank){
   fan.aff = Math.min(100,(fan.aff||0)+1); checkAffStage(fan);
   return '<br><br>看台上的<b>'+fan.name+'</b>喊得最大声：「'+say+'」<span style="font-size:12px;color:var(--ink-soft)">（好友到场，本场发挥 +5）</span>';
 }
-function runMeetResult(tier, city, hits, fan){
+function runMeetResult(tier, city, hits, fan, pace){
   const bonus = hits*2 - 8;
   const w = strokeW();
   const mine = S.talent*w.talent + S.tech*w.tech + S.strength*w.strength + S.diligence*w.dil + (100-S.fatigue)*0.10 + R(14)-7 + bonus
@@ -2186,16 +2332,24 @@ function runMeetResult(tier, city, hits, fan){
   const meetChances = S.trialIdx>=3 ? [0.65,0.5,0.4] : (S.trialIdx>=2 ? [0.65,0.45] : [0.65]);
   meetChances.forEach(ch=>{ if(Math.random() < ch){ const e = makeFriend(city); if(e) extra += e; } });
   const bonusTxt = '<span style="font-size:12px;color:var(--ink-soft)">（划水节奏 '+hits+'/8，发挥'+(bonus>=0?'+':'')+bonus+(window._dqFlag?'；⚠ 抢跳两次，出发犯规':'')+'）</span>';
-  showModal(tier.name+' · 100米'+(strokeName()||'混合'), city+'的泳池，八条泳道。<br><br>'+bonusTxt+'<br><br>'+S.name+'拿到了<b>'+rankTxt+'</b>'+(medalTxt?'，'+medalTxt:'')+'。'+(rank===1?mateNote(WIN_NOTES):'')+fanLine(fan, rank)+extra+rvExtra);
-  drainRival();
-  checkEndings();
-  scheduleTrialIfNeeded();
-  if(S.trialIdx >= 1){
-    const wait = 40+R(40);
-    S.meetDay = S.day + wait;
-    addLog('下一场比赛定在'+wait+'天后。');
-  }
-  save();
+  /* 纪录时刻：折算成绩、检查 PB；分段像转播一样给出 */
+  const t = scoreToTime(window._dqFlag ? 0 : mine);
+  const segTxt = pace ? ('<div class="pbSeg" style="margin-top:10px">分段：前程 <b>'+pace.seg1.toFixed(1)+'″</b> · 后程 <b>'+pace.seg2.toFixed(1)+'″</b>'+(pace.sprint?' · <span style="color:#ffe9b8">后程冲起来了</span>':' · 后程掉速了')+'</div>') : '';
+  const evName = tier.name+' · 100米'+(strokeName()||'混合');
+  const showResult = ()=>{
+    showModal(evName, city+'的泳池，八条泳道。<br><br>'+bonusTxt+'<br><br>'+S.name+'拿到了<b>'+rankTxt+'</b>'+(medalTxt?'，'+medalTxt:'')+' · 成绩 <b>'+fmtTime(t)+'</b>。'+(rank===1?mateNote(WIN_NOTES):'')+fanLine(fan, rank)+extra+rvExtra+segTxt);
+    drainRival();
+    checkEndings();
+    scheduleTrialIfNeeded();
+    if(S.trialIdx >= 1){
+      const wait = 40+R(40);
+      S.meetDay = S.day + wait;
+      addLog('下一场比赛定在'+wait+'天后。');
+    }
+    save();
+  };
+  const brokePb = pbCheck(S.stroke||'free', evName+'（'+city+'）', t, '', showResult);
+  if(!brokePb) showResult();
 }
 function makeFriend(city, intl){
   let cand = S.roster.map((p,i)=>({p,i})).filter(o=>!S.metIdx.includes(o.i) && o.p.r===city);
@@ -2332,7 +2486,7 @@ function planeHud(msg){
     const ev = m.events[m.day-5];
     const b = document.createElement('button'); b.className='btn small';
     b.textContent = '入 场 · 100米'+strokeNameOf(ev);
-    b.onclick = ()=>{ sfx('splash'); openSwimGame(h=>planeDayResult(h, ev), {rounds:8, title:'决 赛 · 100米'+strokeNameOf(ev)}); };
+    b.onclick = ()=>{ sfx('splash'); openSwimGame((h, pace)=>planeDayResult(h, ev, pace), {rounds:8, tIdx:m.tIdx, title:'决 赛 · 100米'+strokeNameOf(ev)}); };
     bx.appendChild(b);
   }
   const q = document.createElement('button'); q.className='btn small'; q.style.opacity=.55;
@@ -2400,7 +2554,7 @@ function planeNext(msg){
   if(m.day >= 5) planeHud('今天有决赛：100米'+strokeNameOf(m.events[m.day-5])+'。<br><span style="font-size:12px;color:var(--ink-soft)">'+msg+'</span>');
   else planeHud('新的一天，去哪儿？<br><span style="font-size:12px;color:var(--ink-soft)">'+msg+'</span>');
 }
-function planeDayResult(hits, evId){
+function planeDayResult(hits, evId, pace){
   const m = S.meet7;
   const bonus = hits*2 - 8;
   const st = m.st;
@@ -2422,9 +2576,16 @@ function planeDayResult(hits, evId){
   let extra = fanLine(fan, rank);
   if(Math.random() < (m.intl?0.5:0.35)){ const e2 = makeFriend(m.city, m.intl); if(e2) extra += e2; }
   const bonusTxt = '<span style="font-size:12px;color:var(--ink-soft)">（划水节奏 '+hits+'/8，发挥'+(bonus>=0?'+':'')+bonus+(notes.length?'；'+notes.join('，'):'')+(window._dqFlag?'；⚠ 抢跳两次，出发犯规':'')+'）</span>';
-  queueModal('决 赛 · 100米'+strokeNameOf(evId),
-    m.city+'的看台坐满了人。八条泳道，一声哨响。<br><br>'+bonusTxt+'<br><br>'+S.name+'拿到<b>第'+rank+'名</b>，获颁一张<b>大赛证书</b>。'+extra+'<br><br><span style="font-size:12px;color:var(--ink-soft)">大赛单项只发证书；奖牌要看七天后的总排名。</span>',
-    [{label:'去吃自助餐', cb:()=>planeBuffet()}]);
+  const t = scoreToTime(window._dqFlag ? 0 : mine);
+  const segTxt = pace ? ('<div class="pbSeg" style="margin-top:10px">分段：前程 <b>'+pace.seg1.toFixed(1)+'″</b> · 后程 <b>'+pace.seg2.toFixed(1)+'″</b>'+(pace.sprint?' · <span style="color:#ffe9b8">后程冲起来了</span>':' · 后程掉速了')+'</div>') : '';
+  const evName = '决 赛 · 100米'+strokeNameOf(evId);
+  const showResult = ()=>{
+    queueModal(evName,
+      m.city+'的看台坐满了人。八条泳道，一声哨响。<br><br>'+bonusTxt+'<br><br>'+S.name+'拿到<b>第'+rank+'名</b> · 成绩 <b>'+fmtTime(t)+'</b>，获颁一张<b>大赛证书</b>。'+extra+'<br><br><span style="font-size:12px;color:var(--ink-soft)">大赛单项只发证书；奖牌要看七天后的总排名。</span>'+segTxt,
+      [{label:'去吃自助餐', cb:()=>planeBuffet()}]);
+  };
+  const brokePb = pbCheck(evId, evName+'（'+m.city+'）', t, '', showResult);
+  if(!brokePb) showResult();
 }
 const BUFFET_BAD = ['冰镇生蚝','凉拌毛蚶','隔夜的小龙虾'];
 const BUFFET_GOOD = ['明炉烤牛排','白灼大虾','清蒸鲈鱼','芝士焗意面','奶油蘑菇汤','蜜汁烤鸡'];
@@ -3196,6 +3357,15 @@ function render(){
   $('meetList').innerHTML = S.meets.length
     ? S.meets.slice().reverse().map(m=>'<div class="meetItem">'+fmtD(m.day)+' · <b>'+m.name+'</b>（'+m.city+'）· '+m.rank+'名</div>').join('')
     : '<div class="hint">还没有比赛记录。</div>';
+  /* 生涯之最：各泳姿 PB + 印章 */
+  const pbKeys = Object.keys(S.pb||{});
+  $('pbList').innerHTML = pbKeys.length
+    ? pbKeys.map(k=>{
+        const st = STROKES.find(x=>x.id===k), p = S.pb[k];
+        const nm = st ? st.name : k;
+        return '<div class="meetItem" style="text-align:left">⏱ <b>'+nm+'</b> · 100米最好成绩 <b style="color:var(--accent)">'+fmtTime(p.t)+'</b>（'+fmtD(p.day)+'）'+((p.count||0)>0?' · 打破过 <b>'+(p.count+1)+'</b> 次纪录':'')+((p.stamps&&p.stamps.length)?'<br><span style="font-size:12px;color:var(--ink-soft)">'+p.stamps.map(s=>'🔖 '+s.name+' '+fmtTime(s.t)).join('<br>')+'</span>':'')+'</div>';
+      }).join('')
+    : '<div class="hint">还没有个人最好成绩。比赛会自动计时，破纪录有仪式。</div>';
   const _seen = seenEnds();
   $('endList').innerHTML = ENDINGS.map(e=>{
     const got = !!(_seen[e.id] || (S.endings && S.endings[e.id]));
@@ -3785,7 +3955,9 @@ function showHelp(){
       '练满一年教练会定你的主项（自由/蛙/蝶/仰）：主项改变天赋/技巧/力量/勤奋的比赛权重，第二年是强制二选一',
       '结识 3 个好友后偶尔有 4x100 接力：队友战力看好感度，夺冠有独有纪念品',
       '名次 = 天赋35% + 技巧30% + 力量15% + 勤奋10% + 状态10%，再加划水发挥（命中×2−8）、好友加油 +5、装备加成，随机只占 ±7',
-      '对手 7 人按赛事级别出分，级别越高越难爆冷'
+      '对手 7 人按赛事级别出分，级别越高越难爆冷',
+      '省锦标赛及以上的划水带配速：前程可点「冲一拍」换高分但耗体力，体力见底后程会掉速；结算像转播一样给出两段分段',
+      '每场比赛都会计时，破个人最好成绩有慢放定格仪式，印记收进战绩页「生涯之最」；打破 5 次有隐藏成就'
     ])) +
     H('🤝 好友', L([
       '比赛会认识各地的对手，通讯录在这里',
@@ -3817,7 +3989,7 @@ function showHelp(){
     ])) +
     H('🏁 结局与成就', L([
       '结局共有 6 个，全部会结束生涯：奥运夺冠 / 告别泳池 / 伤病退役 / 队内淘汰 / 40 岁退役 / 转行教练',
-      '成就不结束生涯，共 10 项：32 岁仍在坚持 / 累计 15 金 / 连胜 10 场 / 图鉴全收集 / 5 位好友满好感 / 结识所有人 / 累计 30 场比赛 / 亦敌亦友 / 惺惺相惜 / 纸短情长',
+      '成就不结束生涯，共 11 项（含隐藏成就）：32 岁仍在坚持 / 累计 15 金 / 连胜 10 场 / 图鉴全收集 / 5 位好友满好感 / 结识所有人 / 累计 30 场比赛 / 亦敌亦友 / 惺惺相惜 / 纸短情长 / 破浪者',
       '成就进度在收藏栏「🏆 成就」页随时可查；合上的手账在首页「回看手账」里'
     ])) +
     H('🍂 四季与队友', L([
